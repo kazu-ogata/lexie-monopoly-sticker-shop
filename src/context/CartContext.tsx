@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export interface CartItem {
   id: string;
@@ -28,25 +29,42 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [userId, setUserId] = useState<string>('guest');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(null);
 
-  // Load cart from localStorage on mount
+  // 1. Monitor user session changes to switch cart keys
   useEffect(() => {
-    const savedCart = localStorage.getItem('lexie_cart');
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error('Failed to parse saved cart:', e);
+    async function resolveUser() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUid = session?.user?.id || 'guest';
+      setUserId(currentUid);
+
+      // Load saved cart for current account
+      const cartKey = `lexie_cart_${currentUid}`;
+      const savedCart = localStorage.getItem(cartKey);
+      if (savedCart) {
+        try {
+          setCart(JSON.parse(savedCart));
+        } catch {
+          setCart([]);
+        }
+      } else {
+        setCart([]);
       }
     }
+
+    resolveUser();
   }, []);
 
-  // Sync cart to localStorage on changes
+  // 2. Sync cart changes to user-specific localStorage key
   useEffect(() => {
-    localStorage.setItem('lexie_cart', JSON.stringify(cart));
-  }, [cart]);
+    if (typeof window !== 'undefined') {
+      const cartKey = `lexie_cart_${userId}`;
+      localStorage.setItem(cartKey, JSON.stringify(cart));
+    }
+  }, [cart, userId]);
 
   const addToCart = (newItem: CartItem) => {
     setCart((prev) => {

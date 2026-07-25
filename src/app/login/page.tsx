@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { useCart } from '../context/CartContext';
-import { createClient } from '../lib/supabase/client';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { useCart } from '@/context/CartContext';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -67,9 +67,10 @@ export default function LoginPage() {
       setLoading(false);
       // Redirect back to Checkout (or Profile) automatically
       router.push(redirectUrl);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Auth error:', err);
-      setErrorMessage(err.message || 'Authentication failed. Please check your details.');
+      const message = err instanceof Error ? err.message : 'Authentication failed. Please check your details.';
+      setErrorMessage(message);
       setLoading(false);
     }
   };

@@ -2,12 +2,12 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
-import StickerCard from '../../components/StickerCard';
-import { createClient } from '../../lib/supabase/client';
-import { Sticker } from '../../types/sticker';
-import { useCart } from '../../context/CartContext';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import StickerCard from '@/components/StickerCard';
+import { createClient } from '@/lib/supabase/client';
+import { Sticker } from '@/types/sticker';
+import { useCart } from '@/context/CartContext';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -41,6 +41,8 @@ export default function ProductDetailPage() {
         setProduct(null);
       } else {
         setProduct(data);
+        // Reset quantity to 1 if stock exists, or 0 if out of stock
+        setQuantity(data.stock > 0 ? 1 : 0);
 
         const { data: relatedData } = await supabase
           .from('stickers')
@@ -57,14 +59,45 @@ export default function ProductDetailPage() {
     fetchProductDetails();
   }, [params.id]);
 
+  const availableStock = product?.stock ?? 0;
+
+  // Strict regex check for Monopoly GO domains (mply.io or s.scope.ly)
+  const isValidMonopolyLink = (url: string): boolean => {
+    const cleanUrl = url.trim();
+    const monopolyRegex = /^https?:\/\/(mply\.io|s\.scope\.ly)\/[a-zA-Z0-9_-]+/i;
+    return monopolyRegex.test(cleanUrl);
+  };
+
   const handleCategoryNavigate = (rarity: string) => {
     const starNum = rarity.replace('-Star', '').replace('★', '').replace('⭐', '').trim();
     router.push(`/?category=${encodeURIComponent(`${starNum} ★`)}`);
   };
 
   const handleAddToCart = () => {
-    if (!inviteLink.trim() || !ign.trim()) {
-      setErrorMessage('Please enter both your Invite Link and In-Game Name before proceeding.');
+    if (availableStock <= 0) {
+      setErrorMessage('Sorry, this sticker is currently out of stock.');
+      return;
+    }
+
+    if (quantity > availableStock) {
+      setErrorMessage(`Only ${availableStock} pieces available in stock.`);
+      return;
+    }
+
+    if (!ign.trim()) {
+      setErrorMessage('Please enter your In-Game Name before proceeding.');
+      return;
+    }
+
+    if (!inviteLink.trim()) {
+      setErrorMessage('Please enter your Monopoly GO Invite Link before proceeding.');
+      return;
+    }
+
+    if (!isValidMonopolyLink(inviteLink)) {
+      setErrorMessage(
+        'Invalid Invite Link! Your link must start with "https://mply.io/" or "https://s.scope.ly/"'
+      );
       return;
     }
 
@@ -88,15 +121,36 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = async () => {
-    if (!inviteLink.trim() || !ign.trim()) {
-      setErrorMessage('Please enter both your Invite Link and In-Game Name before proceeding.');
+    if (availableStock <= 0) {
+      setErrorMessage('Sorry, this sticker is currently out of stock.');
+      return;
+    }
+
+    if (quantity > availableStock) {
+      setErrorMessage(`Only ${availableStock} pieces available in stock.`);
+      return;
+    }
+
+    if (!ign.trim()) {
+      setErrorMessage('Please enter your In-Game Name before proceeding.');
+      return;
+    }
+
+    if (!inviteLink.trim()) {
+      setErrorMessage('Please enter your Monopoly GO Invite Link before proceeding.');
+      return;
+    }
+
+    if (!isValidMonopolyLink(inviteLink)) {
+      setErrorMessage(
+        'Invalid Invite Link! Your link must start with "https://mply.io/" or "https://s.scope.ly/"'
+      );
       return;
     }
 
     setErrorMessage('');
 
     if (product) {
-      // Set direct checkout item
       setBuyNowItem({
         id: product.id,
         name: product.name,
@@ -112,10 +166,8 @@ export default function ProductDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Not logged in -> go to login first, then return to direct checkout
         router.push('/login?redirect=/checkout?mode=direct');
       } else {
-        // Logged in -> go straight to checkout
         router.push('/checkout?mode=direct');
       }
     }
@@ -151,8 +203,6 @@ export default function ProductDetailPage() {
       </div>
     );
   }
-
-  const starCount = parseInt(product.rarity || '6', 10) || 6;
 
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900">
@@ -193,15 +243,7 @@ export default function ProductDetailPage() {
             
             {/* Left Box: Card Display */}
             <div className="md:col-span-6 bg-[#F9F9FB] rounded-2xl p-8 flex flex-col items-center justify-center min-h-[420px] shadow-sm">
-              <div className="flex justify-center space-x-1 mb-4">
-                {Array.from({ length: starCount }).map((_, i) => (
-                  <span key={i} className="text-yellow-400 text-xl">
-                    ⭐
-                  </span>
-                ))}
-              </div>
-
-              <div className="w-full max-w-xs aspect-[4/5] bg-[#FFA2B6] rounded-2xl flex items-center justify-center p-4 shadow-sm">
+              <div className="w-full max-w-xs aspect-[4/5] bg-[#FFC0CB]/40 border border-pink-200/60 rounded-2xl flex items-center justify-center p-4 shadow-sm">
                 {product.image_url ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -210,7 +252,7 @@ export default function ProductDetailPage() {
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <span className="text-center text-white font-semibold text-lg drop-shadow-sm">
+                  <span className="text-center text-pink-500 font-semibold text-lg drop-shadow-sm">
                     {product.name}
                   </span>
                 )}
@@ -234,28 +276,33 @@ export default function ProductDetailPage() {
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center border border-gray-300 rounded-md overflow-hidden bg-white">
                     <button
-                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                      type="button"
+                      onClick={() => setQuantity((q) => Math.max(availableStock > 0 ? 1 : 0, q - 1))}
+                      disabled={quantity <= 1 || availableStock === 0}
+                      className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-white text-xs font-bold cursor-pointer"
                     >
                       -
                     </button>
                     <span className="px-4 py-1.5 text-xs font-bold text-gray-800">
-                      {quantity}
+                      {availableStock === 0 ? 0 : quantity}
                     </span>
                     <button
-                      onClick={() => setQuantity((q) => q + 1)}
-                      className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 text-xs font-bold cursor-pointer"
+                      type="button"
+                      onClick={() => setQuantity((q) => Math.min(availableStock, q + 1))}
+                      disabled={quantity >= availableStock || availableStock === 0}
+                      className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-white text-xs font-bold cursor-pointer"
                     >
                       +
                     </button>
                   </div>
-                  <span className="text-xs text-gray-400 font-medium">
-                    {product.stock ?? 10} pieces available
+
+                  <span className={`text-xs font-bold ${availableStock === 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                    {availableStock === 0 ? 'Out of Stock' : `${availableStock} pieces available`}
                   </span>
                 </div>
               </div>
 
-              {/* Invite Link Input */}
+              {/* Invite Link Input with Auto-Extraction */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-gray-700">
                   Invite Link<span className="text-red-500">*</span>
@@ -266,7 +313,16 @@ export default function ProductDetailPage() {
                   placeholder="https://mply.io/..."
                   value={inviteLink}
                   onChange={(e) => {
-                    setInviteLink(e.target.value);
+                    const inputVal = e.target.value;
+                    // Auto-extract link if full Monopoly GO share text is pasted
+                    const extractedMatch = inputVal.match(/https?:\/\/(mply\.io|s\.scope\.ly)\/[a-zA-Z0-9_-]+/i);
+                    
+                    if (extractedMatch) {
+                      setInviteLink(extractedMatch[0]);
+                    } else {
+                      setInviteLink(inputVal);
+                    }
+
                     if (errorMessage) setErrorMessage('');
                   }}
                   className="w-full bg-[#E5E7EB]/60 rounded-md px-3 py-2.5 text-xs text-gray-800 outline-none focus:bg-white focus:ring-1 focus:ring-pink-500 border border-transparent"
@@ -315,13 +371,15 @@ export default function ProductDetailPage() {
               <div className="space-y-3 pt-2">
                 <button
                   onClick={handleAddToCart}
-                  className="w-full bg-[#EC4899] hover:bg-[#db2777] text-white font-bold py-3 rounded-md transition-colors text-xs tracking-wide cursor-pointer"
+                  disabled={availableStock === 0}
+                  className="w-full bg-[#EC4899] hover:bg-[#db2777] disabled:bg-gray-300 text-white font-bold py-3 rounded-md transition-colors text-xs tracking-wide cursor-pointer disabled:cursor-not-allowed"
                 >
-                  Add to cart
+                  {availableStock === 0 ? 'Out of Stock' : 'Add to cart'}
                 </button>
                 <button
                   onClick={handleBuyNow}
-                  className="w-full bg-[#FBCFE8] hover:bg-[#f472b6] text-gray-900 font-bold py-3 rounded-md transition-colors text-xs tracking-wide cursor-pointer"
+                  disabled={availableStock === 0}
+                  className="w-full bg-[#FBCFE8] hover:bg-[#f472b6] disabled:bg-gray-200 disabled:text-gray-400 text-gray-900 font-bold py-3 rounded-md transition-colors text-xs tracking-wide cursor-pointer disabled:cursor-not-allowed"
                 >
                   Buy Now
                 </button>
@@ -365,7 +423,7 @@ export default function ProductDetailPage() {
                     <strong>30-Minute Delivery:</strong> Because these are digital items, we prioritize speed! 95% of our orders are processed and completed within <strong>15 to 30 minutes</strong>.
                   </li>
                   <li>
-                    <strong>Need Help?</strong> If you haven't received your sticker after 30 minutes, please don't hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website's Live Chat or email us at <strong>support@lexiestickers.com</strong>.
+                    <strong>Need Help?</strong> If you haven&apos;t received your sticker after 30 minutes, please don&apos;t hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website&apos;s Live Chat or email us at <strong>support@lexiestickers.com</strong>.
                   </li>
                 </ul>
               </div>

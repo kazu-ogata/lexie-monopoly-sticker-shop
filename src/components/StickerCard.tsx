@@ -1,32 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { Sticker } from '../types/sticker';
+import { Sticker } from '@/types/sticker';
 
 interface StickerCardProps {
   sticker: Sticker;
 }
 
 export default function StickerCard({ sticker }: StickerCardProps) {
-  // Parse numeric star value cleanly (e.g., '6-Star' -> 6)
-  const starCount = parseInt(sticker.rarity || '6', 10) || 6;
-  const starsArray = Array.from({ length: starCount });
-
   return (
     <Link
       href={`/product/${sticker.id}`}
       className="group bg-white rounded-2xl p-4 border border-gray-200/80 shadow-sm hover:shadow-md hover:border-pink-300 transition-all duration-200 flex flex-col justify-between cursor-pointer w-full h-full"
     >
-      {/* Top Fixed-Height Stars Container */}
-      <div className="flex justify-center items-center space-x-1 mb-2 h-5">
-        {starsArray.map((_, index) => (
-          <span key={index} className="text-yellow-400 text-xs md:text-sm">
-            ⭐
-          </span>
-        ))}
-      </div>
-
-      {/* Card Image Placeholder Box (Identical Aspect Ratio & Color) */}
+      {/* Card Image Box */}
       <div className="w-full bg-[#FFC0CB]/30 rounded-xl aspect-[4/5] flex items-center justify-center p-3 mb-3 overflow-hidden group-hover:scale-[1.02] transition-transform duration-200 border border-pink-200/50">
         {sticker.image_url ? (
           /* eslint-disable-next-line @next/next/no-img-element */

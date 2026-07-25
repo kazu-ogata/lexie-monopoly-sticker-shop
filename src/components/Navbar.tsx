@@ -1,9 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '../lib/supabase/client';
+import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import NotificationBell from '@/components/NotificationBell';
+
+const emptySubscribe = () => () => {};
+function useIsMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+}
 
 interface NavbarProps {
   activeCategory?: string;
@@ -19,8 +29,11 @@ export default function Navbar({
   hideSubNav = false,
 }: NavbarProps) {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSearchCategory, setSelectedSearchCategory] = useState('All');
+  const searchParams = useSearchParams();
+  const isMounted = useIsMounted();
+
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [selectedSearchCategory, setSelectedSearchCategory] = useState(searchParams.get('category') || 'All');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,7 +51,6 @@ export default function Navbar({
 
   const searchCategories = ['All', '6★', '5★', '4★', '3★', '2★', '1★'];
 
-  // Check user session & read admin role
   useEffect(() => {
     async function checkUserSession() {
       const supabase = createClient();
@@ -46,16 +58,9 @@ export default function Navbar({
 
       if (session?.user) {
         setIsLoggedIn(true);
-
-        // Read JWT role injected by the hook OR check direct email
         const userRole = session.user.app_metadata?.user_role || session.user.user_metadata?.user_role;
         const isEmailAdmin = session.user.email === 'admin@email.com';
-
-        if (userRole === 'admin' || isEmailAdmin) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
+        setIsAdmin(userRole === 'admin' || isEmailAdmin);
       } else {
         setIsLoggedIn(false);
         setIsAdmin(false);
@@ -63,6 +68,16 @@ export default function Navbar({
     }
     checkUserSession();
   }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    if (selectedSearchCategory && selectedSearchCategory !== 'All') {
+      params.set('category', selectedSearchCategory);
+    }
+    router.push(`/?${params.toString()}`);
+  };
 
   const handleLogoClick = () => {
     if (onSelectCategory) {
@@ -81,27 +96,19 @@ export default function Navbar({
 
   return (
     <header className="w-full font-sans">
-      {/* Top Pink Header Bar */}
       <div className="bg-[#FFB6C1] px-4 py-3 md:px-8 flex items-center justify-between shadow-sm">
-        {/* Brand Logo - Clickable Home Link */}
-        <Link
-          href="/"
-          onClick={handleLogoClick}
-          className="flex items-center h-10 overflow-visible cursor-pointer"
-        >
+        <Link href="/" onClick={handleLogoClick} className="flex items-center h-10 overflow-visible cursor-pointer">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
             alt="Lexie Stickers Logo"
             className="h-16 w-auto object-contain scale-[1.8] transform origin-center hover:scale-[1.9] transition-transform"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
         </Link>
 
         {/* Search Bar (Desktop) */}
-        <div className="flex-1 max-w-md mx-4 hidden md:flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
+        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden md:flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
           <select
             value={selectedSearchCategory}
             onChange={(e) => setSelectedSearchCategory(e.target.value)}
@@ -120,12 +127,10 @@ export default function Navbar({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-3 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
           />
-          <button className="text-gray-500 hover:text-black px-2 cursor-pointer">🔍</button>
-        </div>
+          <button type="submit" className="text-gray-500 hover:text-black px-2 cursor-pointer">🔍</button>
+        </form>
 
-        {/* Right Icons */}
         <div className="flex items-center space-x-4 md:space-x-6">
-          {/* Mobile Search Toggle Icon */}
           <button
             onClick={() => setShowMobileSearch(!showMobileSearch)}
             className="flex md:hidden text-2xl text-gray-800 hover:text-black cursor-pointer p-1"
@@ -134,39 +139,35 @@ export default function Navbar({
             🔍
           </button>
 
+          {/* Cart Icon */}
           <Link href="/cart" className="relative p-1 text-gray-800 hover:text-black">
             <span className="text-2xl">🛒</span>
-            {cartCount > 0 && (
+            {isMounted && cartCount > 0 && (
               <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                 {cartCount}
               </span>
             )}
           </Link>
 
-          {/* Dynamic Profile/Login Link */}
-          <button
-            onClick={handleProfileClick}
-            className="p-1 text-gray-800 hover:text-black cursor-pointer"
-            aria-label="User Profile"
-          >
+          {/* Real-time Notification Bell */}
+          <NotificationBell isAdmin={isAdmin} />
+
+          {/* User Profile / Login Link */}
+          <button onClick={handleProfileClick} className="p-1 text-gray-800 hover:text-black cursor-pointer" aria-label="User Profile">
             <span className="text-2xl">👤</span>
           </button>
 
-          {/* ⚙️ ADMIN BUTTON: ONLY VISIBLE TO admin@email.com */}
+          {/* Admin Dashboard Pill */}
           {isAdmin && (
-            <Link
-              href="/admin"
-              className="bg-black text-white text-[11px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer flex items-center space-x-1"
-            >
+            <Link href="/admin" className="bg-black text-white text-[11px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer flex items-center space-x-1">
               <span>⚙️ Admin</span>
             </Link>
           )}
         </div>
       </div>
 
-      {/* Expandable Mobile Search Bar */}
       {showMobileSearch && (
-        <div className="block md:hidden px-4 py-2 bg-[#FFB6C1] border-t border-pink-300">
+        <form onSubmit={handleSearchSubmit} className="block md:hidden px-4 py-2 bg-[#FFB6C1] border-t border-pink-300">
           <div className="flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
             <select
               value={selectedSearchCategory}
@@ -187,12 +188,11 @@ export default function Navbar({
               className="flex-1 px-2 text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
               autoFocus
             />
-            <button className="text-gray-500 hover:text-black px-1.5">🔍</button>
+            <button type="submit" className="text-gray-500 hover:text-black px-1.5">🔍</button>
           </div>
-        </div>
+        </form>
       )}
 
-      {/* Sub-Navbar Category Tabs */}
       {!hideSubNav && (
         <nav className="bg-white border-b border-pink-200 px-4 md:px-12 overflow-x-auto">
           <ul className="max-w-7xl mx-auto flex justify-between items-center text-sm font-bold text-gray-800 min-w-max">

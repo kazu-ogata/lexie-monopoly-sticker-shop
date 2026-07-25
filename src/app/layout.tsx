@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { CartProvider } from './context/CartContext';
+import { CartProvider } from '@/context/CartContext';
 
 export const metadata: Metadata = {
   title: 'Lexie Stickers - Monopoly GO Digital Stickers',

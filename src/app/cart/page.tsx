@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { useCart } from '../context/CartContext';
-import { createClient } from '../lib/supabase/client';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { useCart } from '@/context/CartContext';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CartPage() {
   const router = useRouter();
@@ -50,7 +50,7 @@ export default function CartPage() {
               <div className="text-center py-16 space-y-4">
                 <span className="text-5xl block">🛒</span>
                 <h2 className="text-lg font-bold text-gray-800">Your cart is empty</h2>
-                <p className="text-xs text-gray-500">Looks like you haven't added any stickers yet.</p>
+                <p className="text-xs text-gray-500">Looks like you haven&apos;t added any stickers yet.</p>
                 <Link
                   href="/"
                   className="inline-block bg-[#EC4899] text-white font-bold px-6 py-2.5 rounded-lg text-xs hover:bg-pink-600 transition-colors"

@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { useCart } from '../context/CartContext';
-import { createClient } from '../lib/supabase/client';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { useCart } from '@/context/CartContext';
+import { createClient } from '@/lib/supabase/client';
 
 interface OrderItem {
   id: string;
@@ -19,11 +19,23 @@ interface OrderItem {
 interface Order {
   id: string;
   created_at: string;
+  user_id?: string;
   buyer_email: string;
   items: OrderItem[];
   total_amount: number;
   payment_method: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  has_reviewed?: boolean;
+}
+
+interface ContactMessage {
+  id: string;
+  email: string;
+  message: string;
+  admin_reply?: string;
+  admin_reply_at?: string;
+  status: string;
+  created_at: string;
 }
 
 export default function ProfilePage() {
@@ -35,41 +47,51 @@ export default function ProfilePage() {
   // Account State
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
-  // Support Chat State
-  const [supportMessage, setSupportMessage] = useState('');
-  const [chatSent, setChatSent] = useState(false);
+  // Support Messages State
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [submittingReply, setSubmittingReply] = useState(false);
+
+  // Review Modal State
+  const [selectedOrderForReview, setSelectedOrderForReview] = useState<Order | null>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   useEffect(() => {
     async function loadUserDataAndOrders() {
       setLoadingOrders(true);
       const supabase = createClient();
 
-      // 1. Get current authenticated user
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Not logged in -> send to login page
         router.push('/login');
         return;
       }
 
-      setEmail(user.email || '');
-      setUsername(user.user_metadata?.username || user.email?.split('@')[0] || 'User');
+      const userEmail = user.email || '';
+      setEmail(userEmail);
+      const userDisplayName = user.user_metadata?.username || userEmail.split('@')[0] || 'Customer';
+      setUsername(userDisplayName);
 
-      // 2. Fetch orders specific to this logged in user
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('buyer_email', user.email)
+        .or(`user_id.eq.${user.id},buyer_email.eq.${userEmail}`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -78,6 +100,17 @@ export default function ProfilePage() {
         setOrders(data || []);
       }
       setLoadingOrders(false);
+
+      if (userEmail) {
+        setLoadingMessages(true);
+        const { data: msgData } = await supabase
+          .from('contact_messages')
+          .select('*')
+          .eq('email', userEmail)
+          .order('created_at', { ascending: false });
+        setMessages(msgData || []);
+        setLoadingMessages(false);
+      }
     }
 
     loadUserDataAndOrders();
@@ -87,31 +120,171 @@ export default function ProfilePage() {
     e.preventDefault();
     setProfileSuccess('');
     setProfileError('');
+    setIsUpdating(true);
     const supabase = createClient();
 
     try {
-      // Update metadata (username)
       const { error: updateError } = await supabase.auth.updateUser({
+        email: email,
         data: { username },
       });
 
       if (updateError) throw updateError;
 
-      // If new password field is filled, update password
       if (newPassword.trim()) {
         const { error: passError } = await supabase.auth.updateUser({
           password: newPassword,
         });
         if (passError) throw passError;
         setNewPassword('');
-        setCurrentPassword('');
       }
 
       setProfileSuccess('Profile details updated successfully!');
+      setIsEditingProfile(false);
       setTimeout(() => setProfileSuccess(''), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating profile:', err);
-      setProfileError(err.message || 'Failed to update profile.');
+      const message = err instanceof Error ? err.message : 'Failed to update profile details.';
+      setProfileError(message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSendResetPasswordEmail = async () => {
+    setProfileSuccess('');
+    setProfileError('');
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/profile`,
+      });
+
+      if (error) throw error;
+
+      setProfileSuccess(`Password reset email sent to ${email}!`);
+      setTimeout(() => setProfileSuccess(''), 5000);
+    } catch (err: unknown) {
+      console.error('Error sending reset email:', err);
+      const message = err instanceof Error ? err.message : 'Failed to send reset email.';
+      setProfileError(message);
+    }
+  };
+
+  const handleSendUserFollowup = async (msgId: string) => {
+    if (!replyText.trim()) return;
+    setSubmittingReply(true);
+    const supabase = createClient();
+
+    const currentMsg = messages.find(m => m.id === msgId);
+    const updatedMessageText = `${currentMsg?.message}\n\n[User Follow-up]: ${replyText.trim()}`;
+
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ message: updatedMessageText, status: 'unread' })
+      .eq('id', msgId);
+
+    if (error) {
+      console.error('Error sending follow-up:', error);
+      alert('Failed to send message.');
+    } else {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, message: updatedMessageText, status: 'unread' } : m))
+      );
+      setReplyText('');
+    }
+    setSubmittingReply(false);
+  };
+
+  const markOrderReviewed = async (orderId: string) => {
+    const supabase = createClient();
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, has_reviewed: true } : o))
+    );
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ has_reviewed: true })
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Failed to update has_reviewed in DB:', error);
+    }
+  };
+
+  const handleSkipReview = async () => {
+    if (selectedOrderForReview) {
+      await markOrderReviewed(selectedOrderForReview.id);
+      setSelectedOrderForReview(null);
+    }
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrderForReview || !comment.trim()) return;
+
+    setIsSubmittingReview(true);
+    const supabase = createClient();
+
+    try {
+      let proofPublicUrl = '';
+
+      if (proofFile) {
+        const fileExt = proofFile.name.split('.').pop();
+        const fileName = `proof-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
+        const filePath = `proofs/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('sticker-images')
+          .upload(filePath, proofFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('sticker-images')
+            .getPublicUrl(filePath);
+          proofPublicUrl = urlData.publicUrl;
+        }
+      }
+
+      const orderSummaryText =
+        selectedOrderForReview.items
+          ?.map((item) => `${item.quantity}x ${item.name}`)
+          .join(', ') || 'Sticker Purchase';
+
+      const { error: reviewError } = await supabase.from('reviews').insert([
+        {
+          username: username || 'Verified Buyer',
+          rating,
+          order_info: orderSummaryText,
+          comment: comment.trim(),
+        },
+      ]);
+
+      if (reviewError) throw reviewError;
+
+      if (proofPublicUrl) {
+        await supabase.from('proofs').insert([
+          {
+            image_url: proofPublicUrl,
+          },
+        ]);
+      }
+
+      await markOrderReviewed(selectedOrderForReview.id);
+
+      setReviewSuccess(true);
+      setTimeout(() => {
+        setReviewSuccess(false);
+        setSelectedOrderForReview(null);
+        setComment('');
+        setProofFile(null);
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to submit review:', err);
+      alert('Failed to submit review. Please try again.');
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -119,14 +292,6 @@ export default function ProfilePage() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/login');
-  };
-
-  const handleSendSupport = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supportMessage.trim()) return;
-    setChatSent(true);
-    setSupportMessage('');
-    setTimeout(() => setChatSent(false), 4000);
   };
 
   const getStatusBadge = (status: Order['status']) => {
@@ -159,24 +324,22 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900">
+    <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900 relative">
       <div>
         <Navbar hideSubNav={true} cartCount={totalCount} />
 
         <main className="max-w-[1200px] mx-auto px-6 py-10 md:px-12">
-          {/* Page Heading */}
           <div className="border-b border-gray-200 pb-6 mb-8">
             <h1 className="text-3xl font-extrabold text-[#EC4899] tracking-tight">
               My Account
             </h1>
             <p className="text-xs text-gray-500 mt-1">
-              Manage your profile credentials, track sticker orders, and reach support.
+              Manage your profile credentials, track orders, and view support messages.
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* Left Sidebar Navigation */}
+            {/* Sidebar */}
             <div className="lg:col-span-3 bg-[#F9F9FB] border border-gray-200/80 rounded-2xl p-4 space-y-2">
               <button
                 onClick={() => setActiveTab('orders')}
@@ -198,7 +361,7 @@ export default function ProfilePage() {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                <span>👤 Profile & Password</span>
+                <span>👤 Profile &amp; Password</span>
               </button>
 
               <button
@@ -209,7 +372,8 @@ export default function ProfilePage() {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                <span>💬 Live Support & Chat</span>
+                <span>💬 Support Messages</span>
+                <span className="text-[10px] opacity-80">{messages.length}</span>
               </button>
 
               <div className="pt-4 border-t border-gray-200/80">
@@ -222,10 +386,9 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Right Main Panel */}
+            {/* Main Content Pane */}
             <div className="lg:col-span-9 bg-white border border-gray-200/80 rounded-2xl p-6 md:p-8">
-              
-              {/* TAB 1: ORDER HISTORY */}
+              {/* ORDER HISTORY TAB */}
               {activeTab === 'orders' && (
                 <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4">
@@ -242,10 +405,9 @@ export default function ProfilePage() {
                     <div className="text-center py-12 space-y-3">
                       <span className="text-4xl block">📦</span>
                       <p className="text-sm font-bold text-gray-700">No orders found</p>
-                      <p className="text-xs text-gray-400">You haven't purchased any stickers yet.</p>
                       <button
                         onClick={() => router.push('/')}
-                        className="mt-2 bg-[#EC4899] text-white font-bold px-5 py-2 rounded-xl text-xs hover:bg-pink-600 transition-colors"
+                        className="mt-2 bg-[#EC4899] text-white font-bold px-5 py-2 rounded-xl text-xs hover:bg-pink-600 transition-colors cursor-pointer"
                       >
                         Browse Store
                       </button>
@@ -267,8 +429,6 @@ export default function ProfilePage() {
                                   month: 'short',
                                   day: 'numeric',
                                   year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
                                 })}
                               </span>
                             </div>
@@ -280,25 +440,12 @@ export default function ProfilePage() {
                             </div>
                           </div>
 
-                          {/* Purchased Items List */}
                           <div className="space-y-2">
                             {order.items?.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex justify-between items-center text-xs py-1 text-gray-700"
-                              >
+                              <div key={idx} className="flex justify-between items-center text-xs py-1 text-gray-700">
                                 <div>
-                                  <span className="font-bold text-black uppercase">
-                                    {item.name}
-                                  </span>
-                                  <span className="text-gray-500 text-[11px] ml-2">
-                                    x{item.quantity}
-                                  </span>
-                                  {item.ign && (
-                                    <p className="text-[10px] text-gray-400">
-                                      Delivered to IGN: <span className="text-gray-700 font-semibold">{item.ign}</span>
-                                    </p>
-                                  )}
+                                  <span className="font-bold text-black uppercase">{item.name}</span>
+                                  <span className="text-gray-500 text-[11px] ml-2">x{item.quantity}</span>
                                 </div>
                                 <span className="font-bold text-gray-900">
                                   ${(Number(item.price) * item.quantity).toFixed(2)}
@@ -306,6 +453,17 @@ export default function ProfilePage() {
                               </div>
                             ))}
                           </div>
+
+                          {order.status === 'completed' && !order.has_reviewed && (
+                            <div className="pt-2 border-t border-gray-100 flex justify-end">
+                              <button
+                                onClick={() => setSelectedOrderForReview(order)}
+                                className="bg-[#EC4899] text-white hover:bg-pink-600 text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer shadow-xs"
+                              >
+                                ⭐ Leave Review / Proof
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -313,139 +471,315 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* TAB 2: PROFILE & CREDENTIALS */}
-              {activeTab === 'profile' && (
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
+              {/* SUPPORT MESSAGES TAB */}
+              {activeTab === 'support' && (
+                <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4">
-                    <h2 className="text-xl font-extrabold text-black">Profile Information</h2>
-                    <p className="text-xs text-gray-500">Update your username, email, and security password.</p>
+                    <h2 className="text-xl font-extrabold text-black">Support Messages &amp; Inquiries</h2>
+                    <p className="text-xs text-gray-500">View your contact messages and admin responses.</p>
+                  </div>
+
+                  {loadingMessages ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto"></div>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-center py-12 space-y-2">
+                      <span className="text-4xl block">💬</span>
+                      <p className="text-sm font-bold text-gray-700">No support messages found</p>
+                      <p className="text-xs text-gray-400">Use the Contact form in the footer if you need help!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((msg) => (
+                        <div key={msg.id} className="border border-gray-200 rounded-2xl p-5 space-y-3 bg-[#F9F9FB]/50">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-400 font-semibold">
+                              {new Date(msg.created_at).toLocaleString()}
+                            </span>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase ${
+                              msg.status === 'replied' ? 'bg-green-100 text-green-700' : msg.status === 'closed' ? 'bg-gray-200 text-gray-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {msg.status}
+                            </span>
+                          </div>
+
+                          <div className="bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-800">
+                            <span className="font-bold text-gray-500 block text-[10px] mb-1">Your Message:</span>
+                            <p className="whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+
+                          {msg.admin_reply ? (
+                            <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-xs space-y-1">
+                              <span className="text-[#EC4899] font-black block">Lexie Sticker Admin:</span>
+                              <p className="text-gray-700 italic">{msg.admin_reply}</p>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-amber-600 font-semibold">
+                              ⏳ Awaiting response from admin...
+                            </div>
+                          )}
+
+                          {/* Follow-up box or Closed Notice */}
+                          {msg.status === 'closed' ? (
+                            <div className="pt-2 border-t border-gray-200 text-center text-xs font-bold text-gray-500 bg-gray-100 p-3 rounded-xl">
+                              🔒 This support conversation has been closed.
+                            </div>
+                          ) : (
+                            <div className="pt-2">
+                              <div className="space-y-2">
+                                <textarea
+                                  rows={2}
+                                  placeholder="Type a reply or follow-up..."
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  className="w-full bg-white border border-gray-200 rounded-xl p-2.5 text-xs text-gray-800 outline-none focus:ring-1 focus:ring-pink-500"
+                                />
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    disabled={submittingReply}
+                                    onClick={() => handleSendUserFollowup(msg.id)}
+                                    className="bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold px-4 py-1.5 rounded-xl text-xs cursor-pointer shadow-xs"
+                                  >
+                                    {submittingReply ? 'Sending...' : 'Send Follow-up'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* EDITABLE PROFILE & PASSWORD TAB */}
+              {activeTab === 'profile' && (
+                <div className="space-y-6">
+                  <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-extrabold text-black">Profile Information</h2>
+                      <p className="text-xs text-gray-500">Update your account username, email, and password settings.</p>
+                    </div>
+
+                    {!isEditingProfile && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingProfile(true)}
+                        className="bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer flex items-center space-x-1"
+                      >
+                        <span>✏️ Edit Profile</span>
+                      </button>
+                    )}
                   </div>
 
                   {profileSuccess && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 font-bold text-xs p-3 rounded-xl">
+                    <div className="bg-green-50 border border-green-200 text-green-700 text-xs p-3.5 rounded-xl font-bold">
                       ✓ {profileSuccess}
                     </div>
                   )}
-
                   {profileError && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 font-bold text-xs p-3 rounded-xl">
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3.5 rounded-xl font-bold">
                       ⚠️ {profileError}
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Username / Nickname
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="w-full bg-[#E5E7EB]/50 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-pink-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        disabled
-                        value={email}
-                        className="w-full bg-[#E5E7EB]/80 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-100 pt-6 space-y-4">
-                    <h3 className="text-sm font-extrabold text-black">Change Password</h3>
-
+                  <form onSubmit={handleUpdateProfile} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Username */}
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          New Password
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Username / Nickname
                         </label>
                         <input
-                          type="password"
-                          placeholder="••••••••"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full bg-[#E5E7EB]/50 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-pink-500"
+                          type="text"
+                          required
+                          disabled={!isEditingProfile}
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-xs text-gray-800 outline-none transition-colors ${
+                            isEditingProfile
+                              ? 'bg-white border-pink-300 focus:ring-2 focus:ring-pink-500'
+                              : 'bg-[#F9F9FB] border-gray-200 text-gray-600 cursor-not-allowed'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Email Address */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          disabled={!isEditingProfile}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-xs text-gray-800 outline-none transition-colors ${
+                            isEditingProfile
+                              ? 'bg-white border-pink-300 focus:ring-2 focus:ring-pink-500'
+                              : 'bg-[#F9F9FB] border-gray-200 text-gray-600 cursor-not-allowed'
+                          }`}
                         />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      className="bg-[#EC4899] hover:bg-[#db2777] text-white font-extrabold px-6 py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* TAB 3: LIVE CHAT & SUPPORT */}
-              {activeTab === 'support' && (
-                <div className="space-y-6">
-                  <div className="border-b border-gray-100 pb-4">
-                    <h2 className="text-xl font-extrabold text-black">Live Chat &amp; Support</h2>
-                    <p className="text-xs text-gray-500">
-                      Need help with a sticker order or delivery delay? Send us a quick message!
-                    </p>
-                  </div>
-
-                  <div className="bg-[#F9F9FB] border border-gray-200/80 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center space-x-3 text-xs text-gray-600">
-                      <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-                      <span className="font-extrabold text-black">Support Team is Online</span>
-                      <span>(Average response time: &lt; 5 mins)</span>
-                    </div>
-
-                    {chatSent && (
-                      <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-bold p-3 rounded-xl">
-                        ✓ Support ticket created! Our team will reply to your email shortly.
+                    {/* New Password Input (When Editing) */}
+                    {isEditingProfile && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Change Password (Optional)
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Type new password..."
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-white border border-pink-300 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-pink-500"
+                        />
+                        <span className="text-[10px] text-gray-400 mt-1 block">
+                          Leave empty if you don&apos;t want to change your current password.
+                        </span>
                       </div>
                     )}
 
-                    <form onSubmit={handleSendSupport} className="space-y-3">
-                      <textarea
-                        rows={4}
-                        required
-                        placeholder="Describe your issue or include your order number..."
-                        value={supportMessage}
-                        onChange={(e) => setSupportMessage(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-pink-500"
-                      />
-                      <button
-                        type="submit"
-                        className="bg-[#EC4899] hover:bg-[#db2777] text-white font-extrabold px-6 py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
-                      >
-                        Send Message
-                      </button>
-                    </form>
-                  </div>
-
-                  <div className="text-xs text-gray-500 space-y-1 pt-2">
-                    <p>
-                      Direct Email Support: <strong>support@lexiestickers.com</strong>
-                    </p>
-                    <p>Operating Hours: 24/7 Priority Delivery &amp; Support</p>
-                  </div>
+                    {/* Action Buttons when in Edit Mode */}
+                    {isEditingProfile ? (
+                      <div className="flex space-x-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingProfile(false);
+                            setNewPassword('');
+                            setProfileError('');
+                          }}
+                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isUpdating}
+                          className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-xs uppercase tracking-wider"
+                        >
+                          {isUpdating ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    ) : (
+                      /* Standalone Reset Password Trigger Button */
+                      <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-800">Need a Password Reset Link?</h4>
+                          <p className="text-[11px] text-gray-400">Send a recovery link directly to your inbox.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSendResetPasswordEmail}
+                          className="bg-gray-100 hover:bg-pink-50 text-gray-700 hover:text-[#EC4899] border border-gray-200 hover:border-pink-200 font-bold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                        >
+                          🔐 Reset Password via Email
+                        </button>
+                      </div>
+                    )}
+                  </form>
                 </div>
               )}
-
             </div>
           </div>
         </main>
       </div>
 
       <Footer isMinimal={true} />
+
+      {/* FEEDBACK MODAL */}
+      {selectedOrderForReview && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-pink-200">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-lg font-extrabold text-gray-900">
+                🎉 Leave Feedback &amp; Proof
+              </h3>
+              <button
+                onClick={handleSkipReview}
+                className="text-gray-400 hover:text-black font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {reviewSuccess ? (
+              <div className="bg-green-50 text-green-700 p-4 rounded-xl text-center text-xs font-bold">
+                ✓ Thank you for your review! It is now live on our storefront.
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReview} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Rating
+                  </label>
+                  <div className="flex space-x-2 text-2xl cursor-pointer">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className={star <= rating ? 'text-amber-400' : 'text-gray-300'}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Your Feedback <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="Fast delivery, received my sticker in game! Highly recommend!"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="w-full bg-[#F9F9FB] border border-gray-200 rounded-xl p-3 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Upload Screenshot Proof (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg"
+                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                    className="w-full bg-[#F9F9FB] border border-gray-200 rounded-xl p-2 text-xs text-gray-600 outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#EC4899] file:text-white cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSkipReview}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2.5 rounded-xl text-xs cursor-pointer"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-sm uppercase tracking-wider"
+                  >
+                    {isSubmittingReview ? 'Submitting...' : 'Submit Feedback'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

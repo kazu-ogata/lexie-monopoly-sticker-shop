@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 export default function TermsPage() {
   return (
@@ -30,7 +30,7 @@ export default function TermsPage() {
                 1. Agreement to Terms
               </h2>
               <p>
-                By entering, browsing, or purchasing from our website (the "Site"), you confirm that you accept and agree to follow these Terms of Service. If you do not agree to all of these rules, you are strictly prohibited from using our services or purchasing our digital items.
+                By entering, browsing, or purchasing from our website (the &quot;Site&quot;), you confirm that you accept and agree to follow these Terms of Service. If you do not agree to all of these rules, you are strictly prohibited from using our services or purchasing our digital items.
               </p>
             </section>
 
@@ -89,7 +89,7 @@ export default function TermsPage() {
                 6. Disclaimer &amp; Limitation of Liability
               </h2>
               <p>
-                Our services are provided on an "as-is" basis. In no event shall this website, its owners, or its team be held liable for any direct, indirect, unexpected, or consequential damages, operational errors, account restrictions, or game-side updates resulting from the use or delivery of our digital assets.
+                Our services are provided on an &quot;as-is&quot; basis. In no event shall this website, its owners, or its team be held liable for any direct, indirect, unexpected, or consequential damages, operational errors, account restrictions, or game-side updates resulting from the use or delivery of our digital assets.
               </p>
             </section>
 
