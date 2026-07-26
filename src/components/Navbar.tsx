@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useSyncExternalStore } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import NotificationBell from '@/components/NotificationBell';
+import Notification from '@/components/Notification';
 
 const emptySubscribe = () => () => {};
 function useIsMounted() {
@@ -150,7 +150,7 @@ export default function Navbar({
           </Link>
 
           {/* Real-time Notification Bell */}
-          <NotificationBell isAdmin={isAdmin} />
+          <Notification isAdmin={isAdmin} />
 
           {/* User Profile / Login Link */}
           <button onClick={handleProfileClick} className="p-1 text-gray-800 hover:text-black cursor-pointer" aria-label="User Profile">

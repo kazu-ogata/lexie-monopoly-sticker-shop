@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
@@ -12,11 +12,25 @@ export default function Footer({ isMinimal = false }: FooterProps) {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showContact, setShowContact] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [contactEmail, setContactEmail] = useState('');
   const [contactMessage, setContactMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const userRole = session.user.app_metadata?.user_role || session.user.user_metadata?.user_role;
+        const isEmailAdmin = session.user.email === 'admin@email.com';
+        setIsAdmin(userRole === 'admin' || isEmailAdmin);
+      }
+    }
+    checkAdmin();
+  }, []);
 
   const faqItems = [
     {
@@ -157,89 +171,91 @@ export default function Footer({ isMinimal = false }: FooterProps) {
 
   return (
     <>
-      {/* FLOATING CHAT WIDGET CONTAINER */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
-        {/* Pop-up Chat Box */}
-        {showContact && (
-          <div className="mb-3 w-80 sm:w-96 bg-[#FFC0CB] border border-pink-300 rounded-2xl shadow-2xl p-5 space-y-4 text-gray-800 animate-in fade-in slide-in-from-bottom-5 duration-200">
-            <div className="flex justify-between items-center border-b border-pink-300/80 pb-3">
-              <div>
-                <h3 className="font-extrabold text-gray-900 text-sm">Lexie Stickers Support</h3>
-                <p className="text-[10px] text-gray-700">We usually reply via your account profile!</p>
-              </div>
-              <button
-                onClick={() => setShowContact(false)}
-                className="text-gray-700 hover:text-black font-bold text-sm w-7 h-7 rounded-full flex items-center justify-center bg-pink-200 hover:bg-pink-300 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {submitSuccess ? (
-              <div className="bg-emerald-500 text-white p-4 rounded-xl text-center text-xs font-bold">
-                ✓ Message sent successfully! Check your profile for admin replies.
-              </div>
-            ) : (
-              <form onSubmit={handleContactSubmit} className="space-y-3">
+      {/* FLOATING CHAT WIDGET CONTAINER (Only shown if user is NOT admin) */}
+      {!isAdmin && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+          {/* Pop-up Chat Box */}
+          {showContact && (
+            <div className="mb-3 w-80 sm:w-96 bg-[#FFC0CB] border border-pink-300 rounded-2xl shadow-2xl p-5 space-y-4 text-gray-800 animate-in fade-in slide-in-from-bottom-5 duration-200">
+              <div className="flex justify-between items-center border-b border-pink-300/80 pb-3">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-800 block mb-1">
-                    Email Address <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="sample@email.com"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    className="w-full bg-white text-xs px-3 py-2 rounded-xl outline-none text-gray-800 focus:ring-2 focus:ring-pink-500 border border-pink-200"
-                  />
+                  <h3 className="font-extrabold text-gray-900 text-sm">Lexie Stickers Support</h3>
+                  <p className="text-[10px] text-gray-700">We usually reply via your account profile!</p>
                 </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-gray-800 block mb-1">
-                    Your Message <span className="text-red-600">*</span>
-                  </label>
-                  <textarea
-                    required
-                    rows={3}
-                    placeholder="How can we help you?"
-                    value={contactMessage}
-                    onChange={(e) => setContactMessage(e.target.value)}
-                    className="w-full bg-white text-xs px-3 py-2 rounded-xl outline-none text-gray-800 focus:ring-2 focus:ring-pink-500 border border-pink-200 resize-none"
-                  />
-                </div>
-
                 <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-[#EC4899] hover:bg-pink-600 text-white text-xs font-extrabold py-2.5 rounded-xl transition-colors shadow-sm cursor-pointer uppercase tracking-wider"
+                  onClick={() => setShowContact(false)}
+                  className="text-gray-700 hover:text-black font-bold text-sm w-7 h-7 rounded-full flex items-center justify-center bg-pink-200 hover:bg-pink-300 transition-colors cursor-pointer"
                 >
-                  {isSubmitting ? 'Sending...' : 'Send Message'}
+                  ✕
                 </button>
-              </form>
-            )}
+              </div>
 
-            <div className="pt-1 text-[10px] text-gray-700 text-center border-t border-pink-300/50">
-              Direct Email:{' '}
-              <a
-                href="mailto:support@lexiestickers.com?subject=Support%20Inquiry"
-                className="font-bold text-gray-900 hover:text-pink-700 underline"
-              >
-                support@lexiestickers.com
-              </a>
+              {submitSuccess ? (
+                <div className="bg-emerald-500 text-white p-4 rounded-xl text-center text-xs font-bold">
+                  ✓ Message sent successfully! Check your profile for admin replies.
+                </div>
+              ) : (
+                <form onSubmit={handleContactSubmit} className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-800 block mb-1">
+                      Email Address <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="sample@email.com"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      className="w-full bg-white text-xs px-3 py-2 rounded-xl outline-none text-gray-800 focus:ring-2 focus:ring-pink-500 border border-pink-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-800 block mb-1">
+                      Your Message <span className="text-red-600">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="How can we help you?"
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      className="w-full bg-white text-xs px-3 py-2 rounded-xl outline-none text-gray-800 focus:ring-2 focus:ring-pink-500 border border-pink-200 resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-[#EC4899] hover:bg-pink-600 text-white text-xs font-extrabold py-2.5 rounded-xl transition-colors shadow-sm cursor-pointer uppercase tracking-wider"
+                  >
+                    {isSubmitting ? 'Sending...' : 'Send Message'}
+                  </button>
+                </form>
+              )}
+
+              <div className="pt-1 text-[10px] text-gray-700 text-center border-t border-pink-300/50">
+                Direct Email:{' '}
+                <a
+                  href="mailto:support@lexiestickers.com?subject=Support%20Inquiry"
+                  className="font-bold text-gray-900 hover:text-pink-700 underline"
+                >
+                  support@lexiestickers.com
+                </a>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Floating Bubble Toggle Button */}
-        <button
-          onClick={() => setShowContact(!showContact)}
-          aria-label="Toggle Support Chat"
-          className="bg-[#EC4899] hover:bg-pink-600 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer border-2 border-white"
-        >
-          {showContact ? '✕' : '💬'}
-        </button>
-      </div>
+          {/* Floating Bubble Toggle Button */}
+          <button
+            onClick={() => setShowContact(!showContact)}
+            aria-label="Toggle Support Chat"
+            className="bg-[#EC4899] hover:bg-pink-600 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer border-2 border-white"
+          >
+            {showContact ? '✕' : '💬'}
+          </button>
+        </div>
+      )}
 
       {/* Minimal Footer */}
       {isMinimal ? (

@@ -11,11 +11,11 @@ interface Notification {
   created_at: string;
 }
 
-interface NotificationBellProps {
+interface NotificationProps {
   isAdmin?: boolean;
 }
 
-export default function NotificationBell({ isAdmin = false }: NotificationBellProps) {
+export default function Notification({ isAdmin = false }: NotificationProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.is_read).length;

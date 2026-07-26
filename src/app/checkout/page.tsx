@@ -27,14 +27,14 @@ export default function CheckoutPage() {
 
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState('paypal'); // PayPal default
+  const [selectedPayment, setSelectedPayment] = useState('paypal');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Payment Instruction Modal State
-  const [pendingOrder, setPendingOrder] = useState<{ id: string; total: number; method: string } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [proofFile, setProofFile] = useState<File | null>(null);
 
-  // Auto-fill logged-in user email and ID if available
   useEffect(() => {
     async function loadUser() {
       const supabase = createClient();
@@ -47,7 +47,6 @@ export default function CheckoutPage() {
     loadUser();
   }, []);
 
-  // Config for Admin Payment Handles
   const paymentDetails: Record<string, { name: string; handle: string; note: string; image: string }> = {
     paypal: {
       name: 'PayPal',
@@ -81,7 +80,6 @@ export default function CheckoutPage() {
     },
   };
 
-  // SWAPPED: PayPal is now first!
   const paymentMethods = [
     { id: 'paypal', name: 'PayPal', image: '/check-paypal.png', desc: 'Fast and secure transfer via PayPal' },
     { id: 'cashapp', name: 'Cash App', image: '/check-cashapp.png', desc: 'Direct payment via $Cashtag' },
@@ -90,7 +88,8 @@ export default function CheckoutPage() {
     { id: 'chime', name: 'Chime', image: '/check-chime.png', desc: 'Bank transfer via Chime' },
   ];
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
+  // Step 1: Open Payment Modal (Does NOT save order yet)
+  const handleOpenPaymentModal = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
@@ -103,13 +102,36 @@ export default function CheckoutPage() {
       return;
     }
 
+    setErrorMessage('');
+    setShowPaymentModal(true);
+  };
+
+  // Step 2: Finalize Order after Payment Proof is uploaded & confirmed
+  const handleConfirmPaymentAndPlaceOrder = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
 
     try {
       const supabase = createClient();
+      let proofUrl = '';
 
-      // Extract primary IGN and Invite Link from first item as top-level fallback
+      if (proofFile) {
+        const fileExt = proofFile.name.split('.').pop();
+        const fileName = `payment-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
+        const filePath = `proofs/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('sticker-images')
+          .upload(filePath, proofFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('sticker-images')
+            .getPublicUrl(filePath);
+          proofUrl = urlData.publicUrl;
+        }
+      }
+
       const primaryIgn = itemsToCheckout[0]?.ign || '';
       const primaryInvite = itemsToCheckout[0]?.inviteLink || '';
 
@@ -125,6 +147,7 @@ export default function CheckoutPage() {
             total_amount: checkoutTotalCost,
             payment_method: selectedPayment,
             status: 'pending',
+            admin_message: proofUrl ? `Payment Proof Uploaded: ${proofUrl}` : '',
           },
         ])
         .select('id')
@@ -132,35 +155,22 @@ export default function CheckoutPage() {
 
       if (error) {
         console.error('Database Error placing order:', error.message, error.details);
-        setErrorMessage('Failed to place your order. Please try again or contact support.');
+        setErrorMessage('Failed to place your order. Please try again.');
         setIsSubmitting(false);
         return;
       }
 
-      // Order created successfully -> Open Instruction Modal
-      setPendingOrder({
-        id: data.id,
-        total: checkoutTotalCost,
-        method: selectedPayment,
-      });
-
-      // Clear relevant cart state
       if (isDirect) {
         setBuyNowItem(null);
       } else {
         clearCart();
       }
+
+      router.push(`/order-success/${data.id}`);
     } catch (err: unknown) {
       console.error('Unexpected error:', err);
       setErrorMessage('An unexpected error occurred.');
-    } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleFinishOrder = () => {
-    if (pendingOrder) {
-      router.push(`/order-success/${pendingOrder.id}`);
     }
   };
 
@@ -185,7 +195,7 @@ export default function CheckoutPage() {
               </h1>
             </div>
 
-            <form onSubmit={handlePlaceOrder} className="space-y-8">
+            <form onSubmit={handleOpenPaymentModal} className="space-y-8">
               {/* Step 1: Contact Information */}
               <div className="space-y-4">
                 <h2 className="text-base font-extrabold text-gray-900 uppercase tracking-wider">
@@ -229,12 +239,8 @@ export default function CheckoutPage() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={method.image} alt={method.name} className="h-7 w-auto object-contain" />
                         <div>
-                          <h3 className="font-extrabold text-xs text-gray-900">
-                            {method.name}
-                          </h3>
-                          <p className="text-[10px] text-gray-500">
-                            {method.desc}
-                          </p>
+                          <h3 className="font-extrabold text-xs text-gray-900">{method.name}</h3>
+                          <p className="text-[10px] text-gray-500">{method.desc}</p>
                         </div>
                       </div>
                       <input
@@ -249,20 +255,18 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Error Message */}
               {errorMessage && (
                 <div className="text-xs font-bold text-red-500 bg-red-50 p-3 rounded-lg border border-red-200">
                   ⚠️ {errorMessage}
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSubmitting || itemsToCheckout.length === 0}
+                disabled={itemsToCheckout.length === 0}
                 className="w-full bg-[#EC4899] hover:bg-[#db2777] disabled:bg-gray-300 text-white font-extrabold py-4 rounded-xl transition-colors text-xs tracking-wider uppercase cursor-pointer shadow-md"
               >
-                {isSubmitting ? 'Generating Order...' : `Proceed to Pay $${checkoutTotalCost.toFixed(2)} USD`}
+                Proceed to Pay ${checkoutTotalCost.toFixed(2)} USD
               </button>
             </form>
           </div>
@@ -273,11 +277,9 @@ export default function CheckoutPage() {
               Order Details
             </h2>
 
-            {/* Cart / Direct Item List */}
             <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
               {itemsToCheckout.map((item) => {
                 if (!item) return null;
-
                 return (
                   <div key={item.id} className="flex items-center justify-between text-xs py-2 border-b border-gray-200/80">
                     <div className="flex items-center space-x-3">
@@ -291,36 +293,17 @@ export default function CheckoutPage() {
                           </div>
                         )}
                       </div>
-
                       <div>
                         <h4 className="font-extrabold text-black uppercase">{item.name}</h4>
-                        <p className="text-[10px] text-gray-500">
-                          IGN: <span className="font-semibold text-gray-800">{item.ign || 'N/A'}</span>
-                        </p>
-                        <p className="text-[9px] text-gray-400 line-clamp-1">
-                          {item.inviteLink || 'N/A'}
-                        </p>
+                        <p className="text-[10px] text-gray-500">IGN: <span className="font-semibold text-gray-800">{item.ign || 'N/A'}</span></p>
                       </div>
                     </div>
-
                     <span className="font-black text-black text-xs">
                       ${(Number(item.price) * item.quantity).toFixed(2)} USD
                     </span>
                   </div>
                 );
               })}
-            </div>
-
-            {/* Summary Totals */}
-            <div className="space-y-2.5 text-xs font-bold text-gray-700 border-t border-gray-300 pt-4">
-              <div className="flex justify-between items-center uppercase">
-                <span>TOTAL ITEMS</span>
-                <span className="text-black font-extrabold">{checkoutTotalCount}</span>
-              </div>
-              <div className="flex justify-between items-center uppercase">
-                <span>DELIVERY FEE</span>
-                <span className="text-green-600 font-extrabold">FREE</span>
-              </div>
             </div>
 
             <div className="border-t border-gray-300 pt-4 flex justify-between items-center text-sm font-extrabold text-black uppercase">
@@ -334,53 +317,83 @@ export default function CheckoutPage() {
       <Footer isMinimal={true} />
 
       {/* Manual Payment Instructions Modal */}
-      {pendingOrder && (
+      {showPaymentModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border border-pink-200">
-            <div className="w-12 h-12 bg-pink-100 text-[#EC4899] rounded-full flex items-center justify-center mx-auto text-xl font-black">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200 relative max-h-[90vh] overflow-y-auto">
+            
+            {/* Close Button at top-right */}
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-sm w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+
+            <div className="w-12 h-12 bg-pink-100 text-[#EC4899] rounded-full flex items-center justify-center mx-auto text-xl font-black mt-2">
               📲
             </div>
 
             <div className="space-y-1">
               <h3 className="text-xl font-extrabold text-gray-900">Complete Your Payment</h3>
-              <p className="text-xs text-gray-500">
-                Order Reference: <strong className="text-[#EC4899]">#{pendingOrder.id.slice(0, 8)}</strong>
-              </p>
+              <p className="text-xs text-gray-500">Scan QR code or send payment directly.</p>
+            </div>
+
+            {/* QR Code */}
+            <div className="flex flex-col items-center justify-center bg-gray-50 border border-gray-200 rounded-xl p-3">
+              <p className="text-[11px] font-bold text-gray-700 mb-2">Scan QR Code to Pay</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/qrcode.png"
+                alt="Payment QR Code"
+                className="w-36 h-36 object-contain rounded-lg border border-gray-200 bg-white"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             </div>
 
             {/* Payment Details Box */}
-            <div className="bg-[#F9F9FB] border border-gray-200 rounded-xl p-4 text-left space-y-2">
+            <div className="bg-[#F9F9FB] border border-gray-200 rounded-xl p-4 text-left space-y-2 text-xs">
               <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                <span className="text-xs font-bold text-gray-600">Selected Method:</span>
-                <span className="text-xs font-black text-black uppercase">
-                  {paymentDetails[pendingOrder.method]?.name}
-                </span>
+                <span className="font-bold text-gray-600">Selected Method:</span>
+                <span className="font-black text-black uppercase">{paymentDetails[selectedPayment]?.name}</span>
               </div>
-
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-gray-600">Send Payment To:</span>
-                <span className="text-sm font-black text-[#EC4899] bg-pink-50 px-2 py-0.5 rounded border border-pink-200 select-all">
-                  {paymentDetails[pendingOrder.method]?.handle}
+                <span className="font-bold text-gray-600">Send Payment To:</span>
+                <span className="font-black text-[#EC4899] bg-pink-50 px-2 py-0.5 rounded border border-pink-200 select-all">
+                  {paymentDetails[selectedPayment]?.handle}
                 </span>
               </div>
-
               <div className="flex justify-between items-center border-t border-gray-200 pt-2">
-                <span className="text-xs font-bold text-gray-600">Amount Due:</span>
-                <span className="text-sm font-black text-black">
-                  ${pendingOrder.total.toFixed(2)} USD
-                </span>
+                <span className="font-bold text-gray-600">Email Contact:</span>
+                <span className="font-semibold text-black select-all">support@lexiestickers.com</span>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-600">Phone Contact:</span>
+                <span className="font-semibold text-black select-all">09123456789</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                <span className="font-bold text-gray-600">Amount Due:</span>
+                <span className="font-black text-black">${checkoutTotalCost.toFixed(2)} USD</span>
+              </div>
+            </div>
 
-              <p className="text-[10px] text-gray-500 italic pt-1">
-                * Note: {paymentDetails[pendingOrder.method]?.note}
-              </p>
+            {/* Proof of Payment Upload */}
+            <div className="text-left space-y-1">
+              <label className="block text-xs font-bold text-gray-700">Upload Proof of Payment (Screenshot)</label>
+              <input
+                type="file"
+                accept="image/png, image/jpeg"
+                onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                className="w-full bg-[#F9F9FB] border border-gray-200 rounded-xl p-2 text-xs text-gray-600 outline-none file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#EC4899] file:text-white cursor-pointer"
+              />
             </div>
 
             <button
-              onClick={handleFinishOrder}
+              onClick={handleConfirmPaymentAndPlaceOrder}
+              disabled={isSubmitting}
               className="w-full bg-[#EC4899] hover:bg-[#db2777] text-white font-extrabold py-3 rounded-xl transition-colors text-xs uppercase tracking-wider cursor-pointer shadow-md"
             >
-              I Have Sent the Payment
+              {isSubmitting ? 'Placing Order...' : 'I Have Sent the Payment'}
             </button>
           </div>
         </div>

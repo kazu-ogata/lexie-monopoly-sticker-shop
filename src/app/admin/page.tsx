@@ -27,6 +27,8 @@ interface Order {
   total_amount: number;
   payment_method: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  admin_message?: string;
+  user_reply?: string;
 }
 
 interface Review {
@@ -63,10 +65,22 @@ export default function AdminDashboardPage() {
 
   const [loadingAdminCheck, setLoadingAdminCheck] = useState(true);
 
+  // Centered Modal Toast Notification State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
+
   // Orders State
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  // Per-Order Chat Modal State
+  const [chatOrder, setChatOrder] = useState<Order | null>(null);
+  const [chatAdminText, setChatAdminText] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
 
   // Stickers State
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -208,20 +222,62 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error updating order status:', error);
-      alert('Failed to update order status.');
+      showToast('Failed to update order status.', 'error');
     } else {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
+      showToast('Order status updated successfully!');
       fetchStickers();
     }
     setUpdatingOrderId(null);
   };
 
+  const handleSendOrderChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatOrder || !chatAdminText.trim()) return;
+
+    setSendingChat(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ admin_message: chatAdminText.trim() })
+        .eq('id', chatOrder.id);
+
+      if (error) throw error;
+
+      if (chatOrder.user_id) {
+        await supabase.from('notifications').insert([
+          {
+            user_id: chatOrder.user_id,
+            title: `Update on Order #${chatOrder.id.slice(0, 8)}`,
+            message: chatAdminText.trim(),
+            is_read: false,
+          },
+        ]);
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === chatOrder.id ? { ...o, admin_message: chatAdminText.trim() } : o))
+      );
+      setChatOrder(null);
+      setChatAdminText('');
+      showToast('Message sent to buyer successfully!');
+    } catch (err: unknown) {
+      console.error('Error sending order chat message:', err);
+      const message = err instanceof Error ? err.message : 'Failed to send message.';
+      showToast(message, 'error');
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
   const handleAddSticker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!imageFile) {
-      alert('Please select an image file (JPG or PNG).');
+      showToast('Please select an image file (JPG or PNG).', 'error');
       return;
     }
 
@@ -239,7 +295,6 @@ export default function AdminDashboardPage() {
 
       let publicImageUrl = '';
       if (uploadError) {
-        console.warn('Storage bucket upload failed, using local fallback:', uploadError.message);
         publicImageUrl = URL.createObjectURL(imageFile);
       } else {
         const { data: urlData } = supabase.storage
@@ -271,11 +326,12 @@ export default function AdminDashboardPage() {
         setNewStickerPrice('');
         setNewStickerStock('10');
         setImageFile(null);
+        showToast('Sticker added successfully!');
       }
     } catch (err: unknown) {
       console.error('Error adding sticker:', err);
       const message = err instanceof Error ? err.message : 'Failed to add sticker.';
-      alert(message);
+      showToast(message, 'error');
     } finally {
       setAddingSticker(false);
     }
@@ -289,7 +345,7 @@ export default function AdminDashboardPage() {
     try {
       if (manualType === 'review') {
         if (!manualUsername.trim() || !manualComment.trim()) {
-          alert('Please fill in all review fields.');
+          showToast('Please fill in all review fields.', 'error');
           setSubmittingManual(false);
           return;
         }
@@ -305,7 +361,7 @@ export default function AdminDashboardPage() {
         if (error) throw error;
       } else {
         if (!manualFile) {
-          alert('Please upload a proof image.');
+          showToast('Please upload a proof image.', 'error');
           setSubmittingManual(false);
           return;
         }
@@ -339,9 +395,10 @@ export default function AdminDashboardPage() {
       setManualCaption('');
       setManualFile(null);
       fetchFeedback();
+      showToast('Feedback published successfully!');
     } catch (err) {
       console.error('Error adding manual feedback:', err);
-      alert('Failed to add. Please try again.');
+      showToast('Failed to add. Please try again.', 'error');
     } finally {
       setSubmittingManual(false);
     }
@@ -350,35 +407,18 @@ export default function AdminDashboardPage() {
   const handleUpdateStock = async (stickerId: string, currentStock: number, delta: number) => {
     const newStock = Math.max(0, (currentStock || 0) + delta);
     const supabase = createClient();
-
-    const { error } = await supabase
-      .from('stickers')
-      .update({ stock: newStock, is_active: newStock > 0 })
-      .eq('id', stickerId);
-
-    if (error) {
-      console.error('Error updating stock:', error);
-    } else {
-      setStickers((prev) =>
-        prev.map((s) => (s.id === stickerId ? { ...s, stock: newStock, is_active: newStock > 0 } : s))
-      );
-    }
+    await supabase.from('stickers').update({ stock: newStock, is_active: newStock > 0 }).eq('id', stickerId);
+    setStickers((prev) =>
+      prev.map((s) => (s.id === stickerId ? { ...s, stock: newStock, is_active: newStock > 0 } : s))
+    );
   };
 
   const handleToggleStickerActive = async (stickerId: string, currentStatus: boolean) => {
     const supabase = createClient();
-    const { error } = await supabase
-      .from('stickers')
-      .update({ is_active: !currentStatus })
-      .eq('id', stickerId);
-
-    if (error) {
-      console.error('Error toggling sticker status:', error);
-    } else {
-      setStickers((prev) =>
-        prev.map((s) => (s.id === stickerId ? { ...s, is_active: !currentStatus } : s))
-      );
-    }
+    await supabase.from('stickers').update({ is_active: !currentStatus }).eq('id', stickerId);
+    setStickers((prev) =>
+      prev.map((s) => (s.id === stickerId ? { ...s, is_active: !currentStatus } : s))
+    );
   };
 
   const handleRemoveSticker = async (stickerId: string) => {
@@ -391,9 +431,10 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error removing sticker:', error);
-      alert('Failed to remove sticker.');
+      showToast('Failed to remove sticker.', 'error');
     } else {
       setStickers((prev) => prev.filter((s) => s.id !== stickerId));
+      showToast('Sticker listing removed.');
     }
   };
 
@@ -405,9 +446,10 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting review:', error);
-      alert('Failed to delete review.');
+      showToast('Failed to delete review.', 'error');
     } else {
       setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      showToast('Review deleted.');
     }
   };
 
@@ -427,7 +469,7 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error submitting reply:', error);
-      alert('Failed to save reply.');
+      showToast('Failed to save reply.', 'error');
     } else {
       setReviews((prev) =>
         prev.map((r) =>
@@ -438,6 +480,7 @@ export default function AdminDashboardPage() {
       );
       setReplyingReviewId(null);
       setReplyText('');
+      showToast('Reply saved!');
     }
     setSubmittingReply(false);
   };
@@ -450,9 +493,10 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting proof:', error);
-      alert('Failed to delete proof.');
+      showToast('Failed to delete proof.', 'error');
     } else {
       setProofs((prev) => prev.filter((p) => p.id !== proofId));
+      showToast('Proof deleted.');
     }
   };
 
@@ -469,13 +513,14 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error saving contact reply:', error);
-      alert('Failed to save reply.');
+      showToast('Failed to save reply.', 'error');
     } else {
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, admin_reply: msgReplyText.trim(), status: 'replied' } : m))
       );
       setReplyingMsgId(null);
       setMsgReplyText('');
+      showToast('Reply sent!');
     }
     setSendingMsgReply(false);
   };
@@ -484,6 +529,7 @@ export default function AdminDashboardPage() {
     const supabase = createClient();
     await supabase.from('contact_messages').update({ status: newStatus }).eq('id', msgId);
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, status: newStatus } : m)));
+    showToast('Status updated.');
   };
 
   const handleDeleteMessage = async (msgId: string) => {
@@ -493,16 +539,22 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting message:', error);
-      alert('Failed to delete message.');
+      showToast('Failed to delete message.', 'error');
     } else {
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      showToast('Message deleted.');
     }
   };
 
-  // CALCULATE DASHBOARD METRICS
+  // CALCULATE DASHBOARD METRICS WITH COMMAS
   const totalRevenue = orders
     .filter((o) => o.status === 'completed' || o.status === 'processing')
     .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
+
+  const formattedTotalRevenue = totalRevenue.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
   const unreadMessagesCount = messages.filter((m) => m.status === 'unread').length;
@@ -521,7 +573,32 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F9FB] flex flex-col justify-between font-sans text-gray-900">
+    <div className="min-h-screen bg-[#F9F9FB] flex flex-col justify-between font-sans text-gray-900 relative">
+      {/* Centered Modal Toast Notification */}
+      {toast && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-black ${
+              toast.type === 'error' ? 'bg-red-100 text-red-500' : 'bg-pink-100 text-[#EC4899]'
+            }`}>
+              {toast.type === 'error' ? '⚠️' : '✨'}
+            </div>
+            <h3 className="text-lg font-extrabold text-gray-900">
+              {toast.type === 'error' ? 'Notice' : 'Success'}
+            </h3>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {toast.message}
+            </p>
+            <button
+              onClick={() => setToast(null)}
+              className="w-full bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-sm uppercase tracking-wider"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <Navbar hideSubNav={true} />
 
@@ -562,7 +639,7 @@ export default function AdminDashboardPage() {
                   : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
               }`}
             >
-              <span>Overview</span>
+              <span>📊 Overview</span>
             </button>
 
             <button
@@ -630,7 +707,7 @@ export default function AdminDashboardPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-2">
                   <span className="text-2xl block">💰</span>
                   <h3 className="text-xs font-bold text-gray-500 uppercase">Total Revenue</h3>
-                  <p className="text-2xl font-black text-black">${totalRevenue.toFixed(2)} USD</p>
+                  <p className="text-2xl font-black text-black">${formattedTotalRevenue} USD</p>
                 </div>
 
                 {/* Total Orders Card */}
@@ -658,7 +735,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Quick Actions Panel with 3 Distinct Control Boxes */}
+              {/* Quick Actions Panel */}
               <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-xs">
                 <h3 className="text-sm font-extrabold text-black uppercase">Quick Control Shortcuts</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -730,6 +807,21 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <div className="flex items-center space-x-3">
+                          {/* Order Chat Button with User Reply Indicator */}
+                          <button
+                            onClick={() => {
+                              setChatOrder(order);
+                              setChatAdminText(order.admin_message || '');
+                            }}
+                            className={`font-bold text-xs px-3.5 py-1.5 rounded-xl border transition-colors cursor-pointer flex items-center space-x-1 ${
+                              order.user_reply
+                                ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                                : 'bg-pink-50 hover:bg-pink-100 text-[#EC4899] border-pink-200'
+                            }`}
+                          >
+                            <span>💬 {order.user_reply ? '🔔 User Replied!' : 'Message Buyer'}</span>
+                          </button>
+
                           <span className="font-bold text-xs text-gray-500 uppercase">
                             Status:
                           </span>
@@ -911,6 +1003,19 @@ export default function AdminDashboardPage() {
           {/* TAB 3: REVIEWS & PROOFS MODERATION */}
           {activeTab === 'feedback' && (
             <div className="space-y-8">
+              <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+                <div>
+                  <h3 className="text-sm font-extrabold uppercase">Manage Social Media Reviews &amp; Proofs</h3>
+                  <p className="text-xs text-gray-500">Add feedback from Facebook or external platforms manually.</p>
+                </div>
+                <button
+                  onClick={() => setShowManualFeedbackModal(true)}
+                  className="bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-sm"
+                >
+                  + Add Proof / Review
+                </button>
+              </div>
+
               {loadingFeedback ? (
                 <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto"></div>
@@ -1182,6 +1287,56 @@ export default function AdminDashboardPage() {
       </div>
 
       <Footer isMinimal={true} />
+
+      {/* PER-ORDER CHAT MODAL FOR ADMIN */}
+      {chatOrder && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-gray-100">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-lg font-extrabold text-gray-900">Chat for Order #{chatOrder.id.slice(0, 8)}</h3>
+              <button onClick={() => setChatOrder(null)} className="text-gray-400 hover:text-black font-bold text-sm cursor-pointer">✕</button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {chatOrder.admin_message ? (
+                <div className="bg-pink-50 border border-pink-200 rounded-xl p-3">
+                  <span className="font-bold text-[#EC4899] block mb-1">Admin Message Sent:</span>
+                  <p className="text-gray-800">{chatOrder.admin_message}</p>
+                </div>
+              ) : (
+                <p className="text-gray-400 italic">No messages sent for this order yet.</p>
+              )}
+
+              {chatOrder.user_reply ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                  <span className="font-bold text-blue-700 block mb-1">Buyer Reply:</span>
+                  <p className="text-gray-800">{chatOrder.user_reply}</p>
+                </div>
+              ) : (
+                <p className="text-gray-400 italic">No reply from buyer yet.</p>
+              )}
+
+              <form onSubmit={handleSendOrderChatMessage} className="space-y-3 pt-2">
+                <label className="block font-bold text-gray-700">Send New Message to Buyer</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={chatAdminText}
+                  onChange={(e) => setChatAdminText(e.target.value)}
+                  placeholder="Type message regarding order..."
+                  className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
+                />
+                <div className="flex space-x-3 pt-2">
+                  <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
+                  <button type="submit" disabled={sendingChat} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
+                    {sendingChat ? 'Sending...' : 'Send Message'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MANUAL ADD REVIEW OR PROOF MODAL */}
       {showManualFeedbackModal && (

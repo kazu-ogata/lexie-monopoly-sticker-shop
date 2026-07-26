@@ -26,6 +26,8 @@ interface Order {
   payment_method: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   has_reviewed?: boolean;
+  admin_message?: string;
+  user_reply?: string;
 }
 
 interface ContactMessage {
@@ -57,6 +59,11 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
+  // Per-Order Chat Modal State for User
+  const [chatOrder, setChatOrder] = useState<Order | null>(null);
+  const [userReplyText, setUserReplyText] = useState('');
+  const [sendingUserReply, setSendingUserReply] = useState(false);
+
   // Support Messages State
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -70,6 +77,13 @@ export default function ProfilePage() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
     async function loadUserDataAndOrders() {
@@ -172,6 +186,35 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSendOrderReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatOrder || !userReplyText.trim()) return;
+
+    setSendingUserReply(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ user_reply: userReplyText.trim() })
+        .eq('id', chatOrder.id);
+
+      if (error) throw error;
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === chatOrder.id ? { ...o, user_reply: userReplyText.trim() } : o))
+      );
+      setChatOrder(null);
+      setUserReplyText('');
+      showToast('Reply sent to admin successfully!');
+    } catch (err) {
+      console.error('Error sending reply to admin:', err);
+      showToast('Failed to send reply.', 'error');
+    } finally {
+      setSendingUserReply(false);
+    }
+  };
+
   const handleSendUserFollowup = async (msgId: string) => {
     if (!replyText.trim()) return;
     setSubmittingReply(true);
@@ -187,12 +230,13 @@ export default function ProfilePage() {
 
     if (error) {
       console.error('Error sending follow-up:', error);
-      alert('Failed to send message.');
+      showToast('Failed to send message.', 'error');
     } else {
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, message: updatedMessageText, status: 'unread' } : m))
       );
       setReplyText('');
+      showToast('Follow-up sent successfully!');
     }
     setSubmittingReply(false);
   };
@@ -267,6 +311,7 @@ export default function ProfilePage() {
         await supabase.from('proofs').insert([
           {
             image_url: proofPublicUrl,
+            caption: '',
           },
         ]);
       }
@@ -282,7 +327,7 @@ export default function ProfilePage() {
       }, 1500);
     } catch (err) {
       console.error('Failed to submit review:', err);
-      alert('Failed to submit review. Please try again.');
+      showToast('Failed to submit review. Please try again.', 'error');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -325,6 +370,31 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900 relative">
+      {/* Centered Modal Toast Notification */}
+      {toast && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-black ${
+              toast.type === 'error' ? 'bg-red-100 text-red-500' : 'bg-pink-100 text-[#EC4899]'
+            }`}>
+              {toast.type === 'error' ? '⚠️' : '✨'}
+            </div>
+            <h3 className="text-lg font-extrabold text-gray-900">
+              {toast.type === 'error' ? 'Notice' : 'Success'}
+            </h3>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {toast.message}
+            </p>
+            <button
+              onClick={() => setToast(null)}
+              className="w-full bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-sm uppercase tracking-wider"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <Navbar hideSubNav={true} cartCount={totalCount} />
 
@@ -433,6 +503,21 @@ export default function ProfilePage() {
                               </span>
                             </div>
                             <div className="flex items-center space-x-3">
+                              {/* Order Chat Button positioned right next to order status */}
+                              <button
+                                onClick={() => {
+                                  setChatOrder(order);
+                                  setUserReplyText(order.user_reply || '');
+                                }}
+                                className={`font-bold text-xs px-3.5 py-1.5 rounded-xl border transition-colors cursor-pointer flex items-center space-x-1 ${
+                                  order.admin_message && !order.user_reply
+                                    ? 'bg-pink-100 text-[#EC4899] border-pink-300 animate-pulse'
+                                    : 'bg-white hover:bg-pink-50 text-gray-700 border-gray-300'
+                                }`}
+                              >
+                                <span>💬 {order.admin_message ? 'Admin Message' : 'Order Chat'}</span>
+                              </button>
+
                               {getStatusBadge(order.status)}
                               <span className="font-black text-black text-sm">
                                 ${Number(order.total_amount).toFixed(2)} USD
@@ -476,7 +561,7 @@ export default function ProfilePage() {
                 <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4">
                     <h2 className="text-xl font-extrabold text-black">Support Messages &amp; Inquiries</h2>
-                    <p className="text-xs text-gray-500">View your contact messages and admin responses.</p>
+                    <p className="text-xs text-gray-500">View your general contact messages and admin responses.</p>
                   </div>
 
                   {loadingMessages ? (
@@ -509,18 +594,13 @@ export default function ProfilePage() {
                             <p className="whitespace-pre-wrap">{msg.message}</p>
                           </div>
 
-                          {msg.admin_reply ? (
+                          {msg.admin_reply && (
                             <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-xs space-y-1">
                               <span className="text-[#EC4899] font-black block">Lexie Sticker Admin:</span>
                               <p className="text-gray-700 italic">{msg.admin_reply}</p>
                             </div>
-                          ) : (
-                            <div className="text-[11px] text-amber-600 font-semibold">
-                              ⏳ Awaiting response from admin...
-                            </div>
                           )}
 
-                          {/* Follow-up box or Closed Notice */}
                           {msg.status === 'closed' ? (
                             <div className="pt-2 border-t border-gray-200 text-center text-xs font-bold text-gray-500 bg-gray-100 p-3 rounded-xl">
                               🔒 This support conversation has been closed.
@@ -693,6 +773,54 @@ export default function ProfilePage() {
       </div>
 
       <Footer isMinimal={true} />
+
+      {/* PER-ORDER CHAT MODAL FOR USER */}
+      {chatOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-pink-200">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-lg font-extrabold text-gray-900">Support Chat for Order #{chatOrder.id.slice(0, 8)}</h3>
+              <button onClick={() => setChatOrder(null)} className="text-gray-400 hover:text-black font-bold text-sm cursor-pointer">✕</button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {chatOrder.admin_message ? (
+                <div className="bg-pink-50 border border-pink-200 rounded-xl p-3.5 space-y-1">
+                  <span className="font-extrabold text-[#EC4899] block">💬 Lexie Sticker Admin:</span>
+                  <p className="text-gray-800 italic">{chatOrder.admin_message}</p>
+                </div>
+              ) : (
+                <p className="text-gray-400 italic">No messages from admin for this order yet.</p>
+              )}
+
+              {chatOrder.user_reply && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 space-y-1">
+                  <span className="font-extrabold text-blue-700 block">Your Reply:</span>
+                  <p className="text-gray-800">{chatOrder.user_reply}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSendOrderReply} className="space-y-3 pt-2">
+                <label className="block font-bold text-gray-700">Send Reply to Admin</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={userReplyText}
+                  onChange={(e) => setUserReplyText(e.target.value)}
+                  placeholder="Type your reply here..."
+                  className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
+                />
+                <div className="flex space-x-3 pt-2">
+                  <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
+                  <button type="submit" disabled={sendingUserReply} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
+                    {sendingUserReply ? 'Sending...' : 'Send Reply'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FEEDBACK MODAL */}
       {selectedOrderForReview && (
