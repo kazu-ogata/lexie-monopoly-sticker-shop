@@ -29,6 +29,7 @@ interface Order {
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   admin_message?: string;
   user_reply?: string;
+  payment_proof_url?: string;
 }
 
 interface Review {
@@ -65,7 +66,7 @@ export default function AdminDashboardPage() {
 
   const [loadingAdminCheck, setLoadingAdminCheck] = useState(true);
 
-  // Centered Modal Toast Notification State
+  // Centered Modal Toast Notification State (Only for major actions like adding stickers)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -226,12 +227,10 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error updating order status:', error);
-      showToast('Failed to update order status.', 'error');
     } else {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
-      showToast('Order status updated successfully!');
       fetchStickers();
     }
     setUpdatingOrderId(null);
@@ -451,10 +450,8 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting review:', error);
-      showToast('Failed to delete review.', 'error');
     } else {
       setReviews((prev) => prev.filter((r) => r.id !== reviewId));
-      showToast('Review deleted.');
     }
   };
 
@@ -474,7 +471,6 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error submitting reply:', error);
-      showToast('Failed to save reply.', 'error');
     } else {
       setReviews((prev) =>
         prev.map((r) =>
@@ -485,7 +481,6 @@ export default function AdminDashboardPage() {
       );
       setReplyingReviewId(null);
       setReplyText('');
-      showToast('Reply saved!');
     }
     setSubmittingReply(false);
   };
@@ -498,10 +493,8 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting proof:', error);
-      showToast('Failed to delete proof.', 'error');
     } else {
       setProofs((prev) => prev.filter((p) => p.id !== proofId));
-      showToast('Proof deleted.');
     }
   };
 
@@ -518,14 +511,12 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error saving contact reply:', error);
-      showToast('Failed to save reply.', 'error');
     } else {
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, admin_reply: msgReplyText.trim(), status: 'replied' } : m))
       );
       setReplyingMsgId(null);
       setMsgReplyText('');
-      showToast('Reply sent!');
     }
     setSendingMsgReply(false);
   };
@@ -534,7 +525,6 @@ export default function AdminDashboardPage() {
     const supabase = createClient();
     await supabase.from('contact_messages').update({ status: newStatus }).eq('id', msgId);
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, status: newStatus } : m)));
-    showToast('Status updated.');
   };
 
   const handleDeleteMessage = async (msgId: string) => {
@@ -544,10 +534,8 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error('Error deleting message:', error);
-      showToast('Failed to delete message.', 'error');
     } else {
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
-      showToast('Message deleted.');
     }
   };
 
@@ -579,7 +567,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F9F9FB] flex flex-col justify-between font-sans text-gray-900 relative">
-      {/* Centered Modal Toast Notification */}
+      {/* Centered Modal Toast Notification (For critical actions only) */}
       {toast && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
@@ -851,15 +839,15 @@ export default function AdminDashboardPage() {
                           <button
                             onClick={() => {
                               setChatOrder(order);
-                              setChatAdminText(order.admin_message || '');
+                              setChatAdminText(''); 
                             }}
                             className={`font-bold text-xs px-3.5 py-1.5 rounded-xl border transition-colors cursor-pointer flex items-center space-x-1 ${
                               order.user_reply
-                                ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
                                 : 'bg-pink-50 hover:bg-pink-100 text-[#EC4899] border-pink-200'
                             }`}
                           >
-                            <span>💬 {order.user_reply ? '🔔 User Replied!' : 'Message Buyer'}</span>
+                            <span>{order.user_reply ? 'User Replied!' : 'Message Buyer'}</span>
                           </button>
 
                           <span className="font-bold text-xs text-gray-500 uppercase">
@@ -880,6 +868,22 @@ export default function AdminDashboardPage() {
                           </select>
                         </div>
                       </div>
+
+                      {/* Dedicated Payment Proof Section on Order Card */}
+                      {order.payment_proof_url && (
+                        <div className="bg-pink-50/60 border border-pink-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="font-extrabold text-[#EC4899] block uppercase text-[10px]">📸 Payment Proof Attached:</span>
+                            <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="text-gray-700 underline text-[11px] font-bold hover:text-black">
+                              View Full Image Screenshot
+                            </a>
+                          </div>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <a href={order.payment_proof_url} target="_blank" rel="noreferrer">
+                            <img src={order.payment_proof_url} alt="Payment Proof" className="h-16 w-auto object-contain rounded-lg border border-pink-200 bg-white" />
+                          </a>
+                        </div>
+                      )}
 
                       <div className="space-y-3">
                         <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">
@@ -1258,7 +1262,7 @@ export default function AdminDashboardPage() {
 
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="text-red-500 hover:bg-red-50 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-100 cursor-pointer"
+                            className="text-red-500 hover:bg-red-50 text-[10px] font-bold py-1 rounded-lg border border-red-100 cursor-pointer"
                           >
                             🗑️ Delete
                           </button>
@@ -1301,7 +1305,7 @@ export default function AdminDashboardPage() {
                                 onClick={() => handleSendContactReply(msg.id)}
                                 className="bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold px-5 py-1.5 rounded-xl text-xs cursor-pointer shadow-xs"
                               >
-                                {sendingMsgReply ? 'Saving...' : 'Save & Send Reply to Profile'}
+                                {sendingMsgReply ? 'Saving...' : 'Save & Send Reply'}
                               </button>
                             </div>
                           </div>
@@ -1338,41 +1342,44 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {chatOrder.admin_message ? (
+              {chatOrder.admin_message && (
                 <div className="bg-pink-50 border border-pink-200 rounded-xl p-3">
                   <span className="font-bold text-[#EC4899] block mb-1">Admin Message Sent:</span>
                   <p className="text-gray-800">{chatOrder.admin_message}</p>
                 </div>
-              ) : (
-                <p className="text-gray-400 italic">No messages sent for this order yet.</p>
               )}
 
-              {chatOrder.user_reply ? (
+              {chatOrder.user_reply && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                   <span className="font-bold text-blue-700 block mb-1">Buyer Reply:</span>
                   <p className="text-gray-800">{chatOrder.user_reply}</p>
                 </div>
-              ) : (
-                <p className="text-gray-400 italic">No reply from buyer yet.</p>
               )}
 
-              <form onSubmit={handleSendOrderChatMessage} className="space-y-3 pt-2">
-                <label className="block font-bold text-gray-700">Send New Message to Buyer</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={chatAdminText}
-                  onChange={(e) => setChatAdminText(e.target.value)}
-                  placeholder="Type message regarding order..."
-                  className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
-                />
-                <div className="flex space-x-3 pt-2">
-                  <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
-                  <button type="submit" disabled={sendingChat} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
-                    {sendingChat ? 'Sending...' : 'Send Message'}
-                  </button>
+              {/* AUTOMATION: Lock chat if order is completed or cancelled */}
+              {chatOrder.status === 'completed' || chatOrder.status === 'cancelled' ? (
+                <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-center font-bold text-gray-600 mt-2">
+                  🔒 This order is marked as <span className="uppercase text-black">{chatOrder.status}</span>. Chat is now closed.
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleSendOrderChatMessage} className="space-y-3 pt-2">
+                  <label className="block font-bold text-gray-700">Send New Message to Buyer</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={chatAdminText}
+                    onChange={(e) => setChatAdminText(e.target.value)}
+                    placeholder="Type message regarding order..."
+                    className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
+                  />
+                  <div className="flex space-x-3 pt-2">
+                    <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
+                    <button type="submit" disabled={sendingChat} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
+                      {sendingChat ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>

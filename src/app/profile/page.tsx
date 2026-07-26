@@ -743,7 +743,7 @@ export default function ProfilePage() {
                         <button
                           type="submit"
                           disabled={isUpdating}
-                          className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-xs uppercase tracking-wider"
+                          className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-sm uppercase tracking-wider"
                         >
                           {isUpdating ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -784,13 +784,11 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {chatOrder.admin_message ? (
+              {chatOrder.admin_message && (
                 <div className="bg-pink-50 border border-pink-200 rounded-xl p-3.5 space-y-1">
                   <span className="font-extrabold text-[#EC4899] block">💬 Lexie Sticker Admin:</span>
                   <p className="text-gray-800 italic">{chatOrder.admin_message}</p>
                 </div>
-              ) : (
-                <p className="text-gray-400 italic">No messages from admin for this order yet.</p>
               )}
 
               {chatOrder.user_reply && (
@@ -800,23 +798,30 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              <form onSubmit={handleSendOrderReply} className="space-y-3 pt-2">
-                <label className="block font-bold text-gray-700">Send Reply to Admin</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={userReplyText}
-                  onChange={(e) => setUserReplyText(e.target.value)}
-                  placeholder="Type your reply here..."
-                  className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
-                />
-                <div className="flex space-x-3 pt-2">
-                  <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
-                  <button type="submit" disabled={sendingUserReply} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
-                    {sendingUserReply ? 'Sending...' : 'Send Reply'}
-                  </button>
+              {/* AUTOMATION: Lock chat if order is completed or cancelled */}
+              {chatOrder.status === 'completed' || chatOrder.status === 'cancelled' ? (
+                <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-center font-bold text-gray-600 mt-2">
+                  🔒 This order is marked as <span className="uppercase text-black">{chatOrder.status}</span>. Chat is now closed.
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleSendOrderReply} className="space-y-3 pt-2">
+                  <label className="block font-bold text-gray-700">Send Reply to Admin</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={userReplyText}
+                    onChange={(e) => setUserReplyText(e.target.value)}
+                    placeholder="Type your reply here..."
+                    className="w-full bg-[#F9F9FB] border border-pink-200 rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-pink-500 resize-none"
+                  />
+                  <div className="flex space-x-3 pt-2">
+                    <button type="button" onClick={() => setChatOrder(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-bold py-2 rounded-xl cursor-pointer">Close</button>
+                    <button type="submit" disabled={sendingUserReply} className="flex-1 bg-[#EC4899] hover:bg-pink-600 text-white font-extrabold py-2 rounded-xl cursor-pointer shadow-sm">
+                      {sendingUserReply ? 'Sending...' : 'Send Reply'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
