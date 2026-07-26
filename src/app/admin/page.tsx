@@ -87,6 +87,10 @@ export default function AdminDashboardPage() {
   const [loadingStickers, setLoadingStickers] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Custom Deletion Confirmation Modal State
+  const [stickerToDelete, setStickerToDelete] = useState<Sticker | null>(null);
+  const [isDeletingSticker, setIsDeletingSticker] = useState(false);
+
   // Reviews & Proofs State
   const [reviews, setReviews] = useState<Review[]>([]);
   const [proofs, setProofs] = useState<Proof[]>([]);
@@ -421,21 +425,22 @@ export default function AdminDashboardPage() {
     );
   };
 
-  const handleRemoveSticker = async (stickerId: string) => {
-    if (!confirm('Are you sure you want to permanently remove this sticker listing?')) {
-      return;
-    }
+  const handleConfirmRemoveSticker = async () => {
+    if (!stickerToDelete) return;
 
+    setIsDeletingSticker(true);
     const supabase = createClient();
-    const { error } = await supabase.from('stickers').delete().eq('id', stickerId);
+    const { error } = await supabase.from('stickers').delete().eq('id', stickerToDelete.id);
 
     if (error) {
       console.error('Error removing sticker:', error);
       showToast('Failed to remove sticker.', 'error');
     } else {
-      setStickers((prev) => prev.filter((s) => s.id !== stickerId));
+      setStickers((prev) => prev.filter((s) => s.id !== stickerToDelete.id));
       showToast('Sticker listing removed.');
     }
+    setIsDeletingSticker(false);
+    setStickerToDelete(null);
   };
 
   const handleDeleteReview = async (reviewId: string) => {
@@ -595,6 +600,41 @@ export default function AdminDashboardPage() {
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Sticker Deletion Confirmation Modal */}
+      {stickerToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-red-100">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto text-xl font-black bg-red-100 text-red-500">
+              🗑️
+            </div>
+            <h3 className="text-lg font-extrabold text-gray-900">
+              Remove Sticker Listing
+            </h3>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Are you sure you want to permanently remove <span className="font-extrabold text-black uppercase">&quot;{stickerToDelete.name}&quot;</span> from your storefront? This action cannot be undone.
+            </p>
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingSticker}
+                onClick={() => setStickerToDelete(null)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingSticker}
+                onClick={handleConfirmRemoveSticker}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-sm uppercase tracking-wider"
+              >
+                {isDeletingSticker ? 'Removing...' : 'Confirm Remove'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -987,7 +1027,7 @@ export default function AdminDashboardPage() {
                         </button>
 
                         <button
-                          onClick={() => handleRemoveSticker(sticker.id)}
+                          onClick={() => setStickerToDelete(sticker)}
                           className="w-full py-1.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors cursor-pointer border border-red-100"
                         >
                           🗑️ Remove Sticker
