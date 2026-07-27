@@ -10,17 +10,19 @@ interface StickerCardProps {
 export default function StickerCard({ sticker }: StickerCardProps) {
   const starCount = parseInt(sticker.rarity || '6', 10) || 6;
 
-  // Perfected arch layout math for 1 to 6 stars
+  // Arch positioning math with increased horizontal spacing to prevent star collisions
   const getStarTransform = (index: number, total: number) => {
     if (total === 1) return { transform: 'translate(0px, 0px) rotate(0deg)' };
 
     const centerIndex = (total - 1) / 2;
     const offset = index - centerIndex;
     
-    // Horizontal spacing and vertical arc curve drop-off
-    const spacing = total >= 5 ? 13 : 15;
+    // Increased spacing so 2 to 6-star layouts have plenty of breathing room
+    const spacing = 24; 
     const x = offset * spacing;
-    const y = Math.pow(Math.abs(offset), 1.4) * 2.2; 
+    
+    // Smooth sine-wave arc lifting the middle stars up
+    const y = -Math.sin((index / (total - 1)) * Math.PI) * 6; 
     const rotation = offset * 6;
 
     return {
@@ -32,19 +34,19 @@ export default function StickerCard({ sticker }: StickerCardProps) {
   return (
     <Link
       href={`/product/${sticker.id}`}
-      className="group bg-white rounded-2xl p-4 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md hover:border-pink-300 transition-all duration-200 flex flex-col justify-between cursor-pointer w-full h-full"
+      className="group bg-white rounded-2xl p-4 border border-gray-200/80 shadow-sm hover:shadow-md hover:border-pink-300 transition-all duration-200 flex flex-col justify-between cursor-pointer w-full h-full"
     >
-      {/* Card Image / Holder Box with top margin to give stars breathing room */}
-      <div className="w-full bg-[#FFC0CB]/35 rounded-xl aspect-[4/5] flex flex-col items-center justify-between p-2 mb-3 mt-2 overflow-visible relative border border-pink-200/50 group-hover:scale-[1.02] transition-transform duration-200">
+      {/* Card Image / Holder Box */}
+      <div className="w-full bg-[#FFC0CB]/35 rounded-xl aspect-[4/5] flex items-center justify-center p-2 mb-3 relative overflow-visible border border-pink-200/50 group-hover:scale-[1.02] transition-transform duration-200">
         
-        {/* Curved Star Arch Container anchored precisely to the top border */}
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-20">
+        {/* Curved Star Arch Container */}
+        <div className="absolute top-0.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-30 w-full">
           <div className="relative flex items-center justify-center">
             {Array.from({ length: starCount }).map((_, i) => (
               <span
                 key={i}
                 style={getStarTransform(i, starCount)}
-                className="absolute text-base md:text-lg text-yellow-400 drop-shadow-[0_1.5px_1px_rgba(0,0,0,0.35)] select-none"
+                className="absolute text-xl md:text-2xl text-yellow-400 drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.4)] select-none"
               >
                 ⭐
               </span>
@@ -52,24 +54,19 @@ export default function StickerCard({ sticker }: StickerCardProps) {
           </div>
         </div>
 
-        {/* Top Spacer */}
-        <div className="h-3"></div>
-
         {/* Sticker Image Container */}
-        <div className="w-full flex-1 flex items-center justify-center p-1 overflow-hidden">
-          {sticker.image_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={sticker.image_url}
-              alt={sticker.name}
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <span className="text-center text-pink-400/90 font-bold text-xs tracking-wide">
-              Card Image
-            </span>
-          )}
-        </div>
+        {sticker.image_url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={sticker.image_url}
+            alt={sticker.name}
+            className="w-full h-full object-contain rounded-xl"
+          />
+        ) : (
+          <span className="text-center text-pink-400/90 font-bold text-xs tracking-wide">
+            Card Image
+          </span>
+        )}
       </div>
 
       {/* Card Name and Price */}

@@ -17,7 +17,6 @@ function StorefrontContent() {
   const router = useRouter();
   const { totalCount } = useCart();
 
-  // Derive activeCategory & search query directly from URL
   const categoryParam = searchParams.get('category');
   const searchQueryParam = searchParams.get('search') || '';
   const activeCategory = categoryParam || 'Home';
@@ -25,7 +24,6 @@ function StorefrontContent() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Handle Tab Selection
   const handleSelectCategory = (category: string) => {
     if (category === 'Home') {
       router.push('/', { scroll: false });
@@ -34,7 +32,6 @@ function StorefrontContent() {
     }
   };
 
-  // Fetch stickers dynamically based on category, stock, and search query
   useEffect(() => {
     async function fetchStickers() {
       setLoading(true);
@@ -44,12 +41,14 @@ function StorefrontContent() {
         .from('stickers')
         .select('*')
         .eq('is_active', true)
-        .gt('stock', 0) // Only display stickers in stock (> 0)
-        .order('created_at', { ascending: false });
+        .gt('stock', 0);
 
       if (activeCategory !== 'Home') {
         const starNum = activeCategory.replace('★', '').replace('⭐', '').trim();
-        query = query.eq('rarity', `${starNum}-Star`);
+        query = query.eq('rarity', `${starNum}-Star`).order('price', { ascending: false });
+      } else {
+        // HOME TAB: Sort from 6-star down to 1-star (Highest price to lowest price)
+        query = query.order('price', { ascending: false });
       }
 
       if (searchQueryParam.trim()) {

@@ -50,7 +50,7 @@ function ProductDetailContent() {
           .select('*')
           .eq('rarity', data.rarity)
           .neq('id', data.id)
-          .order('name', { ascending: true });
+          .order('price', { ascending: false });
 
         setRelatedCards(relatedData || []);
       }
@@ -61,6 +61,25 @@ function ProductDetailContent() {
   }, [params.id]);
 
   const availableStock = product?.stock ?? 0;
+  const starCount = product ? parseInt(product.rarity || '6', 10) || 6 : 6;
+
+  // Arch math tuned for the larger text-4xl stars and wider spacing
+  const getStarTransform = (index: number, total: number) => {
+    if (total === 1) return { transform: 'translate(0px, 0px) rotate(0deg)' };
+
+    const centerIndex = (total - 1) / 2;
+    const offset = index - centerIndex;
+    
+    const spacing = 38; 
+    const x = offset * spacing;
+    const y = -Math.sin((index / (total - 1)) * Math.PI) * 14; 
+    const rotation = offset * 6;
+
+    return {
+      transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+      zIndex: total - Math.abs(Math.round(offset)),
+    };
+  };
 
   const isValidMonopolyLink = (url: string): boolean => {
     const cleanUrl = url.trim();
@@ -238,8 +257,27 @@ function ProductDetailContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start mb-16">
+            
+            {/* Left Box: Original Sticker Placement with Lower & Slightly Larger Stars */}
             <div className="md:col-span-6 bg-[#F9F9FB] rounded-2xl p-8 flex flex-col items-center justify-center min-h-[420px] shadow-sm">
-              <div className="w-full max-w-xs aspect-[4/5] bg-[#FFC0CB]/40 border border-pink-200/60 rounded-2xl flex items-center justify-center p-4 shadow-sm">
+              <div className="w-full max-w-xs aspect-[4/5] bg-[#FFC0CB]/40 border border-pink-200/60 rounded-2xl flex items-center justify-center p-4 shadow-sm relative overflow-visible">
+                
+                {/* Curved Star Arch Container - Placed lower (top-2) and text-4xl size */}
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-30 w-full">
+                  <div className="relative flex items-center justify-center">
+                    {Array.from({ length: starCount }).map((_, i) => (
+                      <span
+                        key={i}
+                        style={getStarTransform(i, starCount)}
+                        className="absolute text-4xl text-yellow-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.4)] select-none"
+                      >
+                        ⭐
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Original Sticker Image Container (Untouched) */}
                 {product.image_url ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -255,6 +293,7 @@ function ProductDetailContent() {
               </div>
             </div>
 
+            {/* Right Form */}
             <div className="md:col-span-6 space-y-6 pt-2">
               <div>
                 <h1 className="text-3xl font-extrabold text-black tracking-tight mb-1">
