@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { createClient } from '@/lib/supabase/client';
 import { Sticker } from '@/types/sticker';
+
+export const dynamic = 'force-dynamic';
 
 interface OrderItem {
   id: string;
@@ -60,7 +62,7 @@ interface ContactMessage {
   created_at: string;
 }
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'stickers' | 'feedback' | 'messages'>('overview');
 
@@ -843,8 +845,8 @@ export default function AdminDashboardPage() {
                             }}
                             className={`font-bold text-xs px-3.5 py-1.5 rounded-xl border transition-colors cursor-pointer flex items-center space-x-1 ${
                               order.user_reply
-                                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                : 'bg-pink-50 hover:bg-pink-100 text-[#EC4899] border-pink-200'
+                                ? 'bg-amber-100/90 text-amber-800 border-amber-300'
+                                : 'bg-pink-50/90 hover:bg-pink-100 text-[#EC4899] border-pink-200'
                             }`}
                           >
                             <span>{order.user_reply ? 'User Replied!' : 'Message Buyer'}</span>
@@ -1579,5 +1581,19 @@ export default function AdminDashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+        </div>
+      </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }
