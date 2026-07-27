@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+export const dynamic = 'force-dynamic';
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans">

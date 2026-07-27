@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import StickerCard from '@/components/StickerCard';
@@ -9,7 +9,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Sticker } from '@/types/sticker';
 import { useCart } from '@/context/CartContext';
 
-export default function ProductDetailPage() {
+export const dynamic = 'force-dynamic';
+
+function ProductDetailContent() {
   const params = useParams();
   const router = useRouter();
   const { addToCart, setBuyNowItem, totalCount } = useCart();
@@ -41,7 +43,6 @@ export default function ProductDetailPage() {
         setProduct(null);
       } else {
         setProduct(data);
-        // Reset quantity to 1 if stock exists, or 0 if out of stock
         setQuantity(data.stock > 0 ? 1 : 0);
 
         const { data: relatedData } = await supabase
@@ -61,7 +62,6 @@ export default function ProductDetailPage() {
 
   const availableStock = product?.stock ?? 0;
 
-  // Strict regex check for Monopoly GO domains (mply.io or s.scope.ly)
   const isValidMonopolyLink = (url: string): boolean => {
     const cleanUrl = url.trim();
     const monopolyRegex = /^https?:\/\/(mply\.io|s\.scope\.ly)\/[a-zA-Z0-9_-]+/i;
@@ -210,7 +210,6 @@ export default function ProductDetailPage() {
         <Navbar hideSubNav={true} cartCount={totalCount} />
 
         <main className="max-w-7xl mx-auto px-6 py-6 md:px-12">
-          {/* Breadcrumbs Navigation */}
           <div className="flex items-center space-x-3 mb-8 text-xs text-gray-600 font-medium">
             <button
               onClick={() => router.back()}
@@ -238,10 +237,7 @@ export default function ProductDetailPage() {
             </nav>
           </div>
 
-          {/* Product Detail Main Section */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start mb-16">
-            
-            {/* Left Box: Card Display */}
             <div className="md:col-span-6 bg-[#F9F9FB] rounded-2xl p-8 flex flex-col items-center justify-center min-h-[420px] shadow-sm">
               <div className="w-full max-w-xs aspect-[4/5] bg-[#FFC0CB]/40 border border-pink-200/60 rounded-2xl flex items-center justify-center p-4 shadow-sm">
                 {product.image_url ? (
@@ -259,7 +255,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* Right Form */}
             <div className="md:col-span-6 space-y-6 pt-2">
               <div>
                 <h1 className="text-3xl font-extrabold text-black tracking-tight mb-1">
@@ -270,7 +265,6 @@ export default function ProductDetailPage() {
                 </p>
               </div>
 
-              {/* Quantity Selector + Stock Info */}
               <div className="space-y-1.5">
                 <label className="block text-[11px] text-gray-500 font-semibold">Quantity</label>
                 <div className="flex items-center space-x-4">
@@ -302,7 +296,6 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* Invite Link Input with Auto-Extraction */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-gray-700">
                   Invite Link<span className="text-red-500">*</span>
@@ -314,7 +307,6 @@ export default function ProductDetailPage() {
                   value={inviteLink}
                   onChange={(e) => {
                     const inputVal = e.target.value;
-                    // Auto-extract link if full Monopoly GO share text is pasted
                     const extractedMatch = inputVal.match(/https?:\/\/(mply\.io|s\.scope\.ly)\/[a-zA-Z0-9_-]+/i);
                     
                     if (extractedMatch) {
@@ -329,7 +321,6 @@ export default function ProductDetailPage() {
                 />
               </div>
 
-              {/* In-Game Name Input */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-gray-700">
                   In-Game Name<span className="text-red-500">*</span>
@@ -347,14 +338,12 @@ export default function ProductDetailPage() {
                 />
               </div>
 
-              {/* Error / Validation Feedback */}
               {errorMessage && (
                 <p className="text-xs font-bold text-red-500 bg-red-50 p-2.5 rounded-md border border-red-200">
                   ⚠️ {errorMessage}
                 </p>
               )}
 
-              {/* Success Feedback */}
               {addedSuccess && (
                 <p className="text-xs font-bold text-green-700 bg-green-50 p-2.5 rounded-md border border-green-200 flex justify-between items-center">
                   <span>✓ Item added to cart!</span>
@@ -367,7 +356,6 @@ export default function ProductDetailPage() {
                 </p>
               )}
 
-              {/* Action Buttons */}
               <div className="space-y-3 pt-2">
                 <button
                   onClick={handleAddToCart}
@@ -387,59 +375,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Delivery & Support Guarantee Box */}
-          <div className="bg-[#F9F9FB] rounded-2xl p-8 md:p-10 mb-16 space-y-6">
-            <h2 className="text-2xl font-extrabold text-[#EC4899] text-center mb-6">
-              Delivery &amp; Support Guarantee
-            </h2>
-
-            <div className="space-y-6 text-xs text-gray-700 leading-relaxed">
-              <div>
-                <h3 className="font-bold text-sm text-black mb-1">
-                  How to Receive Your Stickers
-                </h3>
-                <p className="text-gray-600 mb-2">
-                  Dear Valued Customers, thank you for choosing <strong>Lexie Stickers</strong>! To ensure your Monopoly GO! stickers arrive safely and smoothly, please follow these quick steps:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1">
-                  <li>
-                    <strong>Before Checkout:</strong> When adding items to your cart, please make sure to fill in your Monopoly GO! Friend <strong>Invite Link</strong> and <strong>In-Game Name</strong>. We require this information to process your delivery!
-                  </li>
-                  <li>
-                    <strong>Add &amp; Send:</strong> Once your purchase is complete, our team will add you in-game and send your ordered stickers directly to your account.
-                  </li>
-                  <li>
-                    <strong>Check In-Game:</strong> After your order is marked complete, you will receive a prompt notification via Email. Simply open your game to claim your new stickers!
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-sm text-black mb-1">
-                  Fast Delivery &amp; Support Guarantee
-                </h3>
-                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1">
-                  <li>
-                    <strong>30-Minute Delivery:</strong> Because these are digital items, we prioritize speed! 95% of our orders are processed and completed within <strong>15 to 30 minutes</strong>.
-                  </li>
-                  <li>
-                    <strong>Need Help?</strong> If you haven&apos;t received your sticker after 30 minutes, please don&apos;t hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website&apos;s Live Chat or email us at <strong>support@lexiestickers.com</strong>.
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-sm text-black mb-1">
-                  1-Day Limited Product Warranty
-                </h3>
-                <p className="text-gray-600">
-                  Due to the nature of digital products, your purchase is fully backed by a <strong>1-Day Limited Warranty</strong>. If there is any issue with your delivery or an oversight on our end, please contact our support channels within 24 hours of purchase so we can resolve it immediately or process your refund. Your satisfaction is our top priority!
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Related Cards Grid */}
           {relatedCards.length > 0 && (
             <div className="mb-12">
               <h3 className="text-xl font-bold text-black mb-6">
@@ -457,5 +392,19 @@ export default function ProductDetailPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function ProductDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+        </div>
+      </div>
+    }>
+      <ProductDetailContent />
+    </Suspense>
   );
 }

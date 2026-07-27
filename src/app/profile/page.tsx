@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCart } from '@/context/CartContext';
 import { createClient } from '@/lib/supabase/client';
+
+export const dynamic = 'force-dynamic';
 
 interface OrderItem {
   id: string;
@@ -40,13 +42,12 @@ interface ContactMessage {
   created_at: string;
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
   const { totalCount } = useCart();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'support'>('orders');
 
-  // Account State
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -55,22 +56,18 @@ export default function ProfilePage() {
   const [profileError, setProfileError] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Orders State
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
-  // Per-Order Chat Modal State for User
   const [chatOrder, setChatOrder] = useState<Order | null>(null);
   const [userReplyText, setUserReplyText] = useState('');
   const [sendingUserReply, setSendingUserReply] = useState(false);
 
-  // Support Messages State
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  // Review Modal State
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<Order | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -78,7 +75,6 @@ export default function ProfilePage() {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
-  // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -370,7 +366,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900 relative">
-      {/* Centered Modal Toast Notification */}
       {toast && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
@@ -409,7 +404,6 @@ export default function ProfilePage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Sidebar */}
             <div className="lg:col-span-3 bg-[#F9F9FB] border border-gray-200/80 rounded-2xl p-4 space-y-2">
               <button
                 onClick={() => setActiveTab('orders')}
@@ -456,9 +450,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Main Content Pane */}
             <div className="lg:col-span-9 bg-white border border-gray-200/80 rounded-2xl p-6 md:p-8">
-              {/* ORDER HISTORY TAB */}
               {activeTab === 'orders' && (
                 <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4">
@@ -503,7 +495,6 @@ export default function ProfilePage() {
                               </span>
                             </div>
                             <div className="flex items-center space-x-3">
-                              {/* Order Chat Button positioned right next to order status */}
                               <button
                                 onClick={() => {
                                   setChatOrder(order);
@@ -556,7 +547,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* SUPPORT MESSAGES TAB */}
               {activeTab === 'support' && (
                 <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4">
@@ -635,7 +625,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* EDITABLE PROFILE & PASSWORD TAB */}
               {activeTab === 'profile' && (
                 <div className="space-y-6">
                   <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
@@ -668,7 +657,6 @@ export default function ProfilePage() {
 
                   <form onSubmit={handleUpdateProfile} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Username */}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
                           Username / Nickname
@@ -687,7 +675,6 @@ export default function ProfilePage() {
                         />
                       </div>
 
-                      {/* Email Address */}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
                           Email Address
@@ -707,7 +694,6 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    {/* New Password Input (When Editing) */}
                     {isEditingProfile && (
                       <div className="pt-2 border-t border-gray-100">
                         <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -726,7 +712,6 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {/* Action Buttons when in Edit Mode */}
                     {isEditingProfile ? (
                       <div className="flex space-x-3 pt-2">
                         <button
@@ -749,7 +734,6 @@ export default function ProfilePage() {
                         </button>
                       </div>
                     ) : (
-                      /* Standalone Reset Password Trigger Button */
                       <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
                         <div>
                           <h4 className="text-xs font-bold text-gray-800">Need a Password Reset Link?</h4>
@@ -774,7 +758,6 @@ export default function ProfilePage() {
 
       <Footer isMinimal={true} />
 
-      {/* PER-ORDER CHAT MODAL FOR USER */}
       {chatOrder && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-pink-200">
@@ -798,7 +781,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* AUTOMATION: Lock chat if order is completed or cancelled */}
               {chatOrder.status === 'completed' || chatOrder.status === 'cancelled' ? (
                 <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-center font-bold text-gray-600 mt-2">
                   🔒 This order is marked as <span className="uppercase text-black">{chatOrder.status}</span>. Chat is now closed.
@@ -827,7 +809,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* FEEDBACK MODAL */}
       {selectedOrderForReview && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-pink-200">
@@ -914,5 +895,19 @@ export default function ProfilePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+        </div>
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }

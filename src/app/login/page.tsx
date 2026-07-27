@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCart } from '@/context/CartContext';
 import { createClient } from '@/lib/supabase/client';
 
-export default function LoginPage() {
+export const dynamic = 'force-dynamic';
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/profile';
@@ -34,7 +36,6 @@ export default function LoginPage() {
 
     try {
       if (isForgotPassword) {
-        // Reset Password Flow
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/profile`,
         });
@@ -46,7 +47,6 @@ export default function LoginPage() {
       }
 
       if (isSignUp) {
-        // Sign Up Flow
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -56,7 +56,6 @@ export default function LoginPage() {
         });
         if (error) throw error;
       } else {
-        // Log In Flow
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -65,7 +64,6 @@ export default function LoginPage() {
       }
 
       setLoading(false);
-      // Redirect back to Checkout (or Profile) automatically
       router.push(redirectUrl);
     } catch (err: unknown) {
       console.error('Auth error:', err);
@@ -82,7 +80,6 @@ export default function LoginPage() {
       <main className="max-w-md w-full mx-auto px-6 py-4 flex-1 flex flex-col justify-center">
         <div className="bg-[#F9F9FB] border border-gray-200/80 rounded-2xl p-7 space-y-5 shadow-xs">
           
-          {/* Card Header */}
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-extrabold text-[#EC4899] tracking-tight">
               {isForgotPassword
@@ -100,7 +97,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Feedback Banners */}
           {errorMessage && (
             <div className="bg-red-50 border border-red-200 text-red-600 font-bold text-xs p-3 rounded-xl text-center">
               ⚠️ {errorMessage}
@@ -113,9 +109,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3.5">
-            {/* Username Input (Sign Up Only) */}
             {isSignUp && !isForgotPassword && (
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -132,7 +126,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Email Input */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">
                 Email Address
@@ -147,7 +140,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Password Input (Hidden in Forgot Password mode) */}
             {!isForgotPassword && (
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -179,7 +171,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -195,7 +186,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Bottom View Switchers */}
           <div className="text-center pt-2 border-t border-gray-200/80 space-y-2">
             {isForgotPassword ? (
               <button
@@ -229,5 +219,19 @@ export default function LoginPage() {
 
       <Footer isMinimal={true} />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

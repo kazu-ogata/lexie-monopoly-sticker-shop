@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+export const dynamic = 'force-dynamic';
+
 export default function OrderSuccessPage() {
   const params = useParams();
   const orderId = params?.id as string;
