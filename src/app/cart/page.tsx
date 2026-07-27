@@ -69,38 +69,71 @@ export default function CartPage() {
                 </div>
 
                 {/* Cart Rows */}
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {cart.map((item) => {
                     const starCount = parseInt(item.rarity || '6', 10) || 6;
 
-                    return (
-                      <div key={item.id} className="grid grid-cols-12 items-center text-xs">
-                        {/* Product Detail Box */}
-                        <div className="col-span-6 flex items-center space-x-4">
-                          <div className="w-20 h-28 bg-[#F9F9FB] border border-gray-200/80 rounded-xl flex flex-col items-center justify-between p-1.5 flex-shrink-0 overflow-hidden">
-                            <div className="flex justify-center space-x-0.5 w-full pt-0.5">
-                              {Array.from({ length: starCount }).map((_, i) => (
-                                <span key={i} className="text-[8px] text-yellow-400 leading-none">
-                                  ⭐
-                                </span>
-                              ))}
-                            </div>
+                    // Proportional arch math scaled for the mini card thumbnail
+                    const getStarTransform = (index: number, total: number) => {
+                      if (total === 1) return { transform: 'translate(0px, 0px) rotate(0deg)' };
 
-                            <div className="w-full h-full my-1 bg-[#FFA2B6] rounded-md flex items-center justify-center text-[9px] text-white font-bold text-center px-1 overflow-hidden">
+                      const centerIndex = (total - 1) / 2;
+                      const offset = index - centerIndex;
+                      
+                      const spacing = 10; 
+                      const x = offset * spacing;
+                      const y = -Math.sin((index / (total - 1)) * Math.PI) * 2.5; 
+                      const rotation = offset * 5;
+
+                      return {
+                        transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+                        zIndex: total - Math.abs(Math.round(offset)),
+                      };
+                    };
+
+                    return (
+                      <div key={item.id} className="grid grid-cols-12 items-center text-xs pb-6 border-b border-gray-100 last:border-b-0">
+                        {/* Product Detail Box */}
+                        <div className="col-span-6 flex items-start space-x-4">
+                          
+                          {/* Miniature Storefront Card Container with tight, balanced padding */}
+                          <div className="w-20 bg-white border border-gray-200/80 rounded-xl p-1.5 flex flex-col items-center flex-shrink-0 shadow-sm relative">
+                            
+                            {/* Inner Pink Sticker Box */}
+                            <div className="w-full bg-[#FFC0CB]/35 rounded-xl aspect-[4/5] flex items-center justify-center p-1 relative overflow-visible border border-pink-200/50">
+                              
+                              {/* Curved Star Arch Container - Placed at top-1.5 */}
+                              <div className="absolute top-0.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-30 w-full">
+                                <div className="relative flex items-center justify-center">
+                                  {Array.from({ length: starCount }).map((_, i) => (
+                                    <span
+                                      key={i}
+                                      style={getStarTransform(i, starCount)}
+                                      className="absolute text-[10px] text-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] select-none"
+                                    >
+                                      ⭐
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Sticker Image */}
                               {item.image_url ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                   src={item.image_url}
                                   alt={item.name}
-                                  className="w-full h-full object-contain"
+                                  className="w-full h-full object-contain rounded-lg"
                                 />
                               ) : (
-                                <span>{item.name}</span>
+                                <span className="text-center text-pink-500 font-bold text-[9px]">
+                                  {item.name}
+                                </span>
                               )}
                             </div>
                           </div>
 
-                          <div className="space-y-1.5">
+                          <div className="space-y-1 pt-2">
                             <h3 className="font-extrabold text-sm text-black uppercase">
                               {item.name}
                             </h3>
@@ -156,7 +189,7 @@ export default function CartPage() {
                 </div>
 
                 {/* Continue Shopping Link */}
-                <div className="pt-10">
+                <div className="pt-6">
                   <Link
                     href="/"
                     className="inline-flex items-center space-x-2 text-sm font-bold text-[#EC4899] hover:underline cursor-pointer"
