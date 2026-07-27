@@ -8,8 +8,6 @@ import Footer from '@/components/Footer';
 import { useCart } from '@/context/CartContext';
 import { createClient } from '@/lib/supabase/client';
 
-export const dynamic = 'force-dynamic';
-
 export default function CartPage() {
   const router = useRouter();
   const { cart, removeFromCart, updateQuantity, totalCount, totalCost } = useCart();
