@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useState, useEffect, useSyncExternalStore, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Notification from '@/components/Notification';
@@ -22,6 +22,90 @@ interface NavbarProps {
   hideSubNav?: boolean;
 }
 
+// Extracted search section wrapped in Suspense to prevent prerender bailout errors on Vercel
+function SearchSection() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [selectedSearchCategory, setSelectedSearchCategory] = useState(searchParams.get('category') || 'All');
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+
+  const searchCategories = ['All', '6★', '5★', '4★', '3★', '2★', '1★'];
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    if (selectedSearchCategory && selectedSearchCategory !== 'All') {
+      params.set('category', selectedSearchCategory);
+    }
+    router.push(`/?${params.toString()}`);
+  };
+
+  return (
+    <>
+      {/* Search Bar (Desktop) */}
+      <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden md:flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
+        <select
+          value={selectedSearchCategory}
+          onChange={(e) => setSelectedSearchCategory(e.target.value)}
+          className="text-xs bg-transparent border-r border-gray-300 pr-2 py-1 outline-none text-gray-700 font-bold cursor-pointer"
+        >
+          {searchCategories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Search Stickers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 px-3 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+        />
+        <button type="submit" className="text-gray-500 hover:text-black px-2 cursor-pointer">🔍</button>
+      </form>
+
+      <button
+        onClick={() => setShowMobileSearch(!showMobileSearch)}
+        className="flex md:hidden text-2xl text-gray-800 hover:text-black cursor-pointer p-1"
+        aria-label="Toggle Search"
+      >
+        🔍
+      </button>
+
+      {showMobileSearch && (
+        <form onSubmit={handleSearchSubmit} className="block md:hidden px-4 py-2 bg-[#FFB6C1] border-t border-pink-300 absolute top-full left-0 right-0 z-50 shadow-md">
+          <div className="flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
+            <select
+              value={selectedSearchCategory}
+              onChange={(e) => setSelectedSearchCategory(e.target.value)}
+              className="text-xs bg-transparent border-r border-gray-300 pr-1 py-1 outline-none text-gray-700 font-bold"
+            >
+              {searchCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Search Stickers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 px-2 text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
+              autoFocus
+            />
+            <button type="submit" className="text-gray-500 hover:text-black px-1.5">🔍</button>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+
 export default function Navbar({
   activeCategory = 'Home',
   onSelectCategory,
@@ -29,13 +113,8 @@ export default function Navbar({
   hideSubNav = false,
 }: NavbarProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const isMounted = useIsMounted();
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [selectedSearchCategory, setSelectedSearchCategory] = useState(searchParams.get('category') || 'All');
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
-  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -48,8 +127,6 @@ export default function Navbar({
     { label: '2 ⭐', value: '2 ★' },
     { label: '1 ⭐', value: '1 ★' },
   ];
-
-  const searchCategories = ['All', '6★', '5★', '4★', '3★', '2★', '1★'];
 
   useEffect(() => {
     async function checkUserSession() {
@@ -69,16 +146,6 @@ export default function Navbar({
     checkUserSession();
   }, []);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params = new URLSearchParams();
-    if (searchQuery.trim()) params.set('search', searchQuery.trim());
-    if (selectedSearchCategory && selectedSearchCategory !== 'All') {
-      params.set('category', selectedSearchCategory);
-    }
-    router.push(`/?${params.toString()}`);
-  };
-
   const handleLogoClick = () => {
     if (onSelectCategory) {
       onSelectCategory('Home');
@@ -95,8 +162,8 @@ export default function Navbar({
   };
 
   return (
-    <header className="w-full font-sans">
-      <div className="bg-[#FFB6C1] px-4 py-3 md:px-8 flex items-center justify-between shadow-sm">
+    <header className="w-full font-sans relative">
+      <div className="bg-[#FFB6C1] px-4 py-3 md:px-8 flex items-center justify-between shadow-sm relative">
         <Link href="/" onClick={handleLogoClick} className="flex items-center h-10 overflow-visible cursor-pointer">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -107,38 +174,12 @@ export default function Navbar({
           />
         </Link>
 
-        {/* Search Bar (Desktop) */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden md:flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
-          <select
-            value={selectedSearchCategory}
-            onChange={(e) => setSelectedSearchCategory(e.target.value)}
-            className="text-xs bg-transparent border-r border-gray-300 pr-2 py-1 outline-none text-gray-700 font-bold cursor-pointer"
-          >
-            {searchCategories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Search Stickers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-3 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
-          />
-          <button type="submit" className="text-gray-500 hover:text-black px-2 cursor-pointer">🔍</button>
-        </form>
+        {/* Wrap SearchSection in Suspense */}
+        <Suspense fallback={<div className="flex-1 max-w-md mx-4 hidden md:block"></div>}>
+          <SearchSection />
+        </Suspense>
 
         <div className="flex items-center space-x-4 md:space-x-6">
-          <button
-            onClick={() => setShowMobileSearch(!showMobileSearch)}
-            className="flex md:hidden text-2xl text-gray-800 hover:text-black cursor-pointer p-1"
-            aria-label="Toggle Search"
-          >
-            🔍
-          </button>
-
           {/* Cart Icon */}
           <Link href="/cart" className="relative p-1 text-gray-800 hover:text-black">
             <span className="text-2xl">🛒</span>
@@ -165,33 +206,6 @@ export default function Navbar({
           )}
         </div>
       </div>
-
-      {showMobileSearch && (
-        <form onSubmit={handleSearchSubmit} className="block md:hidden px-4 py-2 bg-[#FFB6C1] border-t border-pink-300">
-          <div className="flex items-center bg-[#F4F4F5] rounded-md border border-gray-200 overflow-hidden px-2 py-1">
-            <select
-              value={selectedSearchCategory}
-              onChange={(e) => setSelectedSearchCategory(e.target.value)}
-              className="text-xs bg-transparent border-r border-gray-300 pr-1 py-1 outline-none text-gray-700 font-bold"
-            >
-              {searchCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Search Stickers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-2 text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
-              autoFocus
-            />
-            <button type="submit" className="text-gray-500 hover:text-black px-1.5">🔍</button>
-          </div>
-        </form>
-      )}
 
       {!hideSubNav && (
         <nav className="bg-white border-b border-pink-200 px-4 md:px-12 overflow-x-auto">
