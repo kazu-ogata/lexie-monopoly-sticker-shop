@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCart } from '@/context/CartContext';
 import { createClient } from '@/lib/supabase/client';
 
-export default function CheckoutPage() {
+export const dynamic = 'force-dynamic';
+
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode');
@@ -177,7 +179,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans text-gray-900 relative">
       <div>
-        <Navbar hideSubNav={true} cartCount={totalCount} />
+        <Navbar hideSubNav={true} cartCount={checkoutTotalCount} />
 
         <main className="max-w-[1400px] mx-auto px-6 py-10 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
@@ -399,5 +401,19 @@ export default function CheckoutPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+        </div>
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 }
