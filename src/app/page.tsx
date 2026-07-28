@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import StickerCard from '@/components/StickerCard';
 import ReviewsAndProofs from '@/components/ReviewsAndProofs';
 import Footer from '@/components/Footer';
+import { ProductGridSkeleton } from '@/components/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Sticker } from '@/types/sticker';
 import { useCart } from '@/context/CartContext';
@@ -47,7 +48,6 @@ function StorefrontContent() {
         const starNum = activeCategory.replace('★', '').replace('⭐', '').trim();
         query = query.eq('rarity', `${starNum}-Star`).order('price', { ascending: false });
       } else {
-        // HOME TAB: Sort from 6-star down to 1-star (Highest price to lowest price)
         query = query.order('price', { ascending: false });
       }
 
@@ -92,9 +92,7 @@ function StorefrontContent() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
-          </div>
+          <ProductGridSkeleton />
         ) : stickers.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-200/80 shadow-sm max-w-lg mx-auto my-8">
             <span className="text-4xl mb-2 block">📭</span>
@@ -128,8 +126,8 @@ export default function HomePage() {
     <div id="top" className="min-h-screen bg-gray-50 flex flex-col justify-between font-sans">
       <Suspense
         fallback={
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+          <div className="max-w-7xl mx-auto px-4 py-12 w-full">
+            <ProductGridSkeleton />
           </div>
         }
       >
