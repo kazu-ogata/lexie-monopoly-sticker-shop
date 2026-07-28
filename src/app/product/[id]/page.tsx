@@ -5,6 +5,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import StickerCard from '@/components/StickerCard';
+import { PageLoaderSkeleton } from '@/components/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Sticker } from '@/types/sticker';
 import { useCart } from '@/context/CartContext';
@@ -196,9 +197,7 @@ function ProductDetailContent() {
     return (
       <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
         <Navbar hideSubNav={true} cartCount={totalCount} />
-        <div className="flex justify-center py-32">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
-        </div>
+        <PageLoaderSkeleton />
         <Footer />
       </div>
     );
@@ -213,7 +212,7 @@ function ProductDetailContent() {
           <p className="text-xs text-gray-500 mb-6">The sticker you requested could not be found.</p>
           <button
             onClick={() => router.push('/')}
-            className="bg-[#EC4899] text-white font-bold px-6 py-2 rounded-xl text-xs"
+            className="bg-[#EC4899] text-white font-bold px-6 py-2 rounded-xl text-xs cursor-pointer"
           >
             Return to Storefront
           </button>
@@ -241,13 +240,13 @@ function ProductDetailContent() {
             <span className="text-gray-300">|</span>
 
             <nav className="flex items-center space-x-1.5">
-              <button onClick={() => router.push('/')} className="hover:underline">
+              <button onClick={() => router.push('/')} className="hover:underline cursor-pointer">
                 Home
               </button>
               <span>&gt;</span>
               <button
                 onClick={() => handleCategoryNavigate(product.rarity)}
-                className="hover:underline font-semibold"
+                className="hover:underline font-semibold cursor-pointer"
               >
                 {product.rarity.replace('-Star', '⭐')}
               </button>
@@ -490,9 +489,7 @@ export default function ProductDetailPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-white flex flex-col justify-between font-sans">
-        <div className="flex justify-center py-32">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
-        </div>
+        <PageLoaderSkeleton />
       </div>
     }>
       <ProductDetailContent />
