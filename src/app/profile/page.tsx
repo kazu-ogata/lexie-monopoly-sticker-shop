@@ -253,10 +253,20 @@ function ProfileContent() {
     }
   };
 
+  // Closes the modal safely without marking the order as reviewed
+  const handleCloseReviewModal = () => {
+    setSelectedOrderForReview(null);
+    setComment('');
+    setProofFile(null);
+  };
+
+  // Explicitly skips and dismisses the review prompt permanently
   const handleSkipReview = async () => {
     if (selectedOrderForReview) {
       await markOrderReviewed(selectedOrderForReview.id);
       setSelectedOrderForReview(null);
+      setComment('');
+      setProofFile(null);
     }
   };
 
@@ -817,7 +827,7 @@ function ProfileContent() {
                 🎉 Leave Feedback &amp; Proof
               </h3>
               <button
-                onClick={handleSkipReview}
+                onClick={handleCloseReviewModal}
                 className="text-gray-400 hover:text-black font-bold text-sm cursor-pointer"
               >
                 ✕
