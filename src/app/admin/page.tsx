@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
 
   const [loadingAdminCheck, setLoadingAdminCheck] = useState(true);
 
-  // Centered Modal Toast Notification State (Only for major actions like adding stickers)
+  // Centered Modal Toast Notification State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -87,6 +87,10 @@ export default function AdminDashboardPage() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loadingStickers, setLoadingStickers] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Sticker Search & Filter State
+  const [stickerSearchQuery, setStickerSearchQuery] = useState('');
+  const [selectedRarityFilter, setSelectedRarityFilter] = useState('all');
 
   // Custom Deletion Confirmation Modal State
   const [stickerToDelete, setStickerToDelete] = useState<Sticker | null>(null);
@@ -340,6 +344,23 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // INDIVIDUAL STICKER FIELD UPDATES
+  const handleUpdateStickerField = async (stickerId: string, field: 'price' | 'rarity', value: string | number) => {
+    const supabase = createClient();
+    const updatePayload: Record<string, unknown> = { [field]: value };
+
+    const { error } = await supabase.from('stickers').update(updatePayload).eq('id', stickerId);
+
+    if (error) {
+      console.error(`Error updating sticker ${field}:`, error);
+      showToast('Failed to update sticker.', 'error');
+    } else {
+      setStickers((prev) =>
+        prev.map((s) => (s.id === stickerId ? { ...s, [field]: value } : s))
+      );
+    }
+  };
+
   const handleManualFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = createClient();
@@ -539,6 +560,13 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // FILTERED STICKERS FOR INVENTORY TAB
+  const filteredStickers = stickers.filter((sticker) => {
+    const matchesSearch = sticker.name.toLowerCase().includes(stickerSearchQuery.toLowerCase());
+    const matchesRarity = selectedRarityFilter === 'all' || sticker.rarity === selectedRarityFilter;
+    return matchesSearch && matchesRarity;
+  });
+
   // CALCULATE DASHBOARD METRICS WITH COMMAS
   const totalRevenue = orders
     .filter((o) => o.status === 'completed' || o.status === 'processing')
@@ -567,7 +595,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F9F9FB] flex flex-col justify-between font-sans text-gray-900 relative">
-      {/* Centered Modal Toast Notification (For critical actions only) */}
+      {/* Centered Modal Toast Notification */}
       {toast && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
@@ -939,25 +967,55 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 2: STICKER INVENTORY */}
+          {/* TAB 2: STICKER INVENTORY WITH SEARCH & RARITY FILTER */}
           {activeTab === 'stickers' && (
             <div className="space-y-6">
+              {/* Search & Filter Bar */}
+              <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap justify-between items-center gap-4 shadow-xs">
+                <div className="flex-1 min-w-[240px]">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search sticker by name..."
+                    value={stickerSearchQuery}
+                    onChange={(e) => setStickerSearchQuery(e.target.value)}
+                    className="w-full bg-[#F9F9FB] border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Filter:</span>
+                  <select
+                    value={selectedRarityFilter}
+                    onChange={(e) => setSelectedRarityFilter(e.target.value)}
+                    className="bg-[#F9F9FB] border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-black outline-none cursor-pointer focus:ring-2 focus:ring-pink-500"
+                  >
+                    <option value="all">All Rarities</option>
+                    <option value="6-Star">6-Star (6 ⭐)</option>
+                    <option value="5-Star">5-Star (5 ⭐)</option>
+                    <option value="4-Star">4-Star (4 ⭐)</option>
+                    <option value="3-Star">3-Star (3 ⭐)</option>
+                    <option value="2-Star">2-Star (2 ⭐)</option>
+                    <option value="1-Star">1-Star (1 ⭐)</option>
+                  </select>
+                </div>
+              </div>
+
               {loadingStickers ? (
                 <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto"></div>
                   <p className="text-xs text-gray-400 mt-3">Loading inventory...</p>
                 </div>
-              ) : stickers.length === 0 ? (
+              ) : filteredStickers.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 space-y-3">
-                  <span className="text-4xl block">🏷️</span>
-                  <h3 className="text-sm font-bold text-gray-800">No Stickers in Storefront</h3>
+                  <span className="text-4xl block">🔍</span>
+                  <h3 className="text-sm font-bold text-gray-800">No Matching Stickers Found</h3>
                   <p className="text-xs text-gray-400">
-                    Click &quot;+ Add New Sticker&quot; above to list your first sticker for sale!
+                    Try adjusting your search query or rarity filter.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {stickers.map((sticker) => (
+                  {filteredStickers.map((sticker) => (
                     <div
                       key={sticker.id}
                       className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 shadow-xs flex flex-col justify-between"
@@ -982,16 +1040,67 @@ export default function AdminDashboardPage() {
                           )}
                         </div>
 
-                        <div>
-                          <span className="text-[10px] font-extrabold text-amber-500 uppercase">
-                            {sticker.rarity}
-                          </span>
-                          <h3 className="font-extrabold text-sm text-black uppercase">
+                        <div className="space-y-2">
+                          <h3 className="font-extrabold text-sm text-black uppercase line-clamp-1">
                             {sticker.name}
                           </h3>
-                          <p className="font-black text-xs text-gray-800">
-                            ${Number(sticker.price).toFixed(2)} USD
-                          </p>
+
+                          {/* Editable Rarity / Category Dropdown */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase">Rarity</label>
+                            <select
+                              value={sticker.rarity}
+                              onChange={(e) => {
+                                const newRarity = e.target.value;
+                                handleUpdateStickerField(sticker.id, 'rarity', newRarity);
+                                
+                                // Optional auto-pricing when rarity changes
+                                const standardPrices: Record<string, number> = {
+                                  '1-Star': 0.99,
+                                  '2-Star': 1.49,
+                                  '3-Star': 1.99,
+                                  '4-Star': 3.99,
+                                  '5-Star': 5.99,
+                                  '6-Star': 6.99,
+                                };
+                                if (standardPrices[newRarity] !== undefined) {
+                                  handleUpdateStickerField(sticker.id, 'price', standardPrices[newRarity]);
+                                }
+                              }}
+                              className="w-full bg-[#F9F9FB] border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-black outline-none cursor-pointer focus:ring-1 focus:ring-pink-500"
+                            >
+                              <option value="6-Star">6-Star (6 ⭐)</option>
+                              <option value="5-Star">5-Star (5 ⭐)</option>
+                              <option value="4-Star">4-Star (4 ⭐)</option>
+                              <option value="3-Star">3-Star (3 ⭐)</option>
+                              <option value="2-Star">2-Star (2 ⭐)</option>
+                              <option value="1-Star">1-Star (1 ⭐)</option>
+                            </select>
+                          </div>
+
+                          {/* Editable Price Input */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase">Price (USD)</label>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs font-bold text-gray-500">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={sticker.price}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setStickers((prev) =>
+                                    prev.map((s) => (s.id === sticker.id ? { ...s, price: val } : s))
+                                  );
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  handleUpdateStickerField(sticker.id, 'price', val);
+                                }}
+                                className="w-full bg-[#F9F9FB] border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-black text-black outline-none focus:bg-white focus:ring-1 focus:ring-pink-500"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -1356,7 +1465,6 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              {/* AUTOMATION: Lock chat if order is completed or cancelled */}
               {chatOrder.status === 'completed' || chatOrder.status === 'cancelled' ? (
                 <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-center font-bold text-gray-600 mt-2">
                   🔒 This order is marked as <span className="uppercase text-black">{chatOrder.status}</span>. Chat is now closed.
@@ -1532,7 +1640,21 @@ export default function AdminDashboardPage() {
                   </label>
                   <select
                     value={newStickerRarity}
-                    onChange={(e) => setNewStickerRarity(e.target.value)}
+                    onChange={(e) => {
+                      const selectedRarity = e.target.value;
+                      setNewStickerRarity(selectedRarity);
+                      const standardPrices: Record<string, string> = {
+                        '1-Star': '0.99',
+                        '2-Star': '1.49',
+                        '3-Star': '1.99',
+                        '4-Star': '3.99',
+                        '5-Star': '5.99',
+                        '6-Star': '6.99',
+                      };
+                      if (standardPrices[selectedRarity]) {
+                        setNewStickerPrice(standardPrices[selectedRarity]);
+                      }
+                    }}
                     className="w-full bg-[#F9F9FB] border border-gray-200 rounded-xl px-2 py-2 text-xs text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-pink-500"
                   >
                     <option value="6-Star">6 ⭐</option>
