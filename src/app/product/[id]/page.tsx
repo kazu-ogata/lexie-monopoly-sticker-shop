@@ -414,6 +414,58 @@ function ProductDetailContent() {
             </div>
           </div>
 
+          {/* Delivery & Support Guarantee Box */}
+          <div className="bg-[#F9F9FB] rounded-2xl p-8 md:p-10 mb-16 space-y-6">
+            <h2 className="text-2xl font-extrabold text-[#EC4899] text-center mb-6">
+              Delivery &amp; Support Guarantee
+            </h2>
+
+            <div className="space-y-6 text-xs text-gray-700 leading-relaxed">
+              <div>
+                <h3 className="font-bold text-sm text-black mb-1">
+                  How to Receive Your Stickers
+                </h3>
+                <p className="text-gray-600 mb-2">
+                  Dear Valued Customers, thank you for choosing <strong>Lexie Stickers</strong>! To ensure your Monopoly GO! stickers arrive safely and smoothly, please follow these quick steps:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1">
+                  <li>
+                    <strong>Before Checkout:</strong> When adding items to your cart, please make sure to fill in your Monopoly GO! Friend <strong>Invite Link</strong> and <strong>In-Game Name</strong>. We require this information to process your delivery!
+                  </li>
+                  <li>
+                    <strong>Add &amp; Send:</strong> Once your purchase is complete, our team will add you in-game and send your ordered stickers directly to your account.
+                  </li>
+                  <li>
+                    <strong>Check In-Game:</strong> After your order is marked complete, you will receive a prompt notification via Email. Simply open your game to claim your new stickers!
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-sm text-black mb-1">
+                  Fast Delivery &amp; Support Guarantee
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-gray-600 pl-1">
+                  <li>
+                    <strong>30-Minute Delivery:</strong> Because these are digital items, we prioritize speed! 95% of our orders are processed and completed within <strong>15 to 30 minutes</strong>.
+                  </li>
+                  <li>
+                    <strong>Need Help?</strong> If you haven&apos;t received your sticker after 30 minutes, please don&apos;t hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website&apos;s Live Chat or email us at <strong>support@lexiestickers.com</strong>.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-sm text-black mb-1">
+                  1-Day Limited Product Warranty
+                </h3>
+                <p className="text-gray-600">
+                  Due to the nature of digital products, your purchase is fully backed by a <strong>1-Day Limited Warranty</strong>. If there is any issue with your delivery or an oversight on our end, please contact our support channels within 24 hours of purchase so we can resolve it immediately or process your refund. Your satisfaction is our top priority!
+                </p>
+              </div>
+            </div>
+          </div>
+
           {relatedCards.length > 0 && (
             <div className="mb-12">
               <h3 className="text-xl font-bold text-black mb-6">
