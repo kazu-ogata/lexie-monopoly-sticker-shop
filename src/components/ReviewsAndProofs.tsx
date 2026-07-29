@@ -19,10 +19,11 @@ interface Proof {
   image_url?: string;
 }
 
+// Skeleton loader for Reviews tab
 function ReviewGridSkeleton() {
   return (
     <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start animate-pulse">
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: 12 }).map((_, i) => (
         <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 h-32 space-y-2.5">
           <div className="flex justify-between items-center">
             <div className="h-3 bg-gray-200 rounded w-1/3" />
