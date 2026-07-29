@@ -46,7 +46,6 @@ interface Review {
 interface Proof {
   id: string;
   image_url?: string;
-  caption: string;
   created_at: string;
 }
 
@@ -101,13 +100,12 @@ export default function AdminDashboardPage() {
   const [proofs, setProofs] = useState<Proof[]>([]);
   const [loadingFeedback, setLoadingFeedback] = useState(true);
 
-  // Manual Add Review/Proof Modal State
+  // Manual Add Review/Proof Modal State (Caption removed)
   const [showManualFeedbackModal, setShowManualFeedbackModal] = useState(false);
   const [manualType, setManualType] = useState<'review' | 'proof'>('proof');
   const [manualUsername, setManualUsername] = useState('');
   const [manualRating, setManualRating] = useState(5);
   const [manualComment, setManualComment] = useState('');
-  const [manualCaption, setManualCaption] = useState('');
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [submittingManual, setSubmittingManual] = useState(false);
 
@@ -344,7 +342,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // INDIVIDUAL STICKER FIELD UPDATES
   const handleUpdateStickerField = async (stickerId: string, field: 'price' | 'rarity', value: string | number) => {
     const supabase = createClient();
     const updatePayload: Record<string, unknown> = { [field]: value };
@@ -407,7 +404,6 @@ export default function AdminDashboardPage() {
         const { error: proofError } = await supabase.from('proofs').insert([
           {
             image_url: urlData.publicUrl,
-            caption: manualCaption.trim(),
           },
         ]);
         if (proofError) throw proofError;
@@ -416,7 +412,6 @@ export default function AdminDashboardPage() {
       setShowManualFeedbackModal(false);
       setManualUsername('');
       setManualComment('');
-      setManualCaption('');
       setManualFile(null);
       fetchFeedback();
       showToast('Feedback published successfully!');
@@ -560,14 +555,12 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // FILTERED STICKERS FOR INVENTORY TAB
   const filteredStickers = stickers.filter((sticker) => {
     const matchesSearch = sticker.name.toLowerCase().includes(stickerSearchQuery.toLowerCase());
     const matchesRarity = selectedRarityFilter === 'all' || sticker.rarity === selectedRarityFilter;
     return matchesSearch && matchesRarity;
   });
 
-  // CALCULATE DASHBOARD METRICS WITH COMMAS
   const totalRevenue = orders
     .filter((o) => o.status === 'completed' || o.status === 'processing')
     .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
@@ -595,7 +588,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F9F9FB] flex flex-col justify-between font-sans text-gray-900 relative">
-      {/* Centered Modal Toast Notification */}
       {toast && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-pink-200">
@@ -620,7 +612,6 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Custom Sticker Deletion Confirmation Modal */}
       {stickerToDelete && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-red-100">
@@ -659,7 +650,6 @@ export default function AdminDashboardPage() {
         <Navbar hideSubNav={true} />
 
         <main className="max-w-7xl mx-auto px-6 py-8 md:px-12">
-          {/* Header Bar */}
           <div className="flex flex-wrap justify-between items-center pb-6 border-b border-gray-200 mb-8 gap-4">
             <div>
               <div className="flex items-center space-x-2">
@@ -685,7 +675,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Navigation Tabs */}
           <div className="flex flex-wrap gap-2 mb-8">
             <button
               onClick={() => setActiveTab('overview')}
@@ -755,18 +744,15 @@ export default function AdminDashboardPage() {
             </button>
           </div>
 
-          {/* TAB 0: OVERVIEW / DASHBOARD */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {/* Total Revenue Card */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-2">
                   <span className="text-2xl block">💰</span>
                   <h3 className="text-xs font-bold text-gray-500 uppercase">Total Revenue</h3>
                   <p className="text-2xl font-black text-black">${formattedTotalRevenue} USD</p>
                 </div>
 
-                {/* Total Orders Card */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-2">
                   <span className="text-2xl block">📦</span>
                   <h3 className="text-xs font-bold text-gray-500 uppercase">Total Orders</h3>
@@ -774,7 +760,6 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] text-amber-600 font-bold">{pendingOrdersCount} pending orders</p>
                 </div>
 
-                {/* Active Inventory Card */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-2">
                   <span className="text-2xl block">🏷️</span>
                   <h3 className="text-xs font-bold text-gray-500 uppercase">Stickers Listed</h3>
@@ -782,7 +767,6 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] text-red-500 font-bold">{lowStockCount} items low in stock</p>
                 </div>
 
-                {/* Customer Inquiries Card */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-2">
                   <span className="text-2xl block">📬</span>
                   <h3 className="text-xs font-bold text-gray-500 uppercase">Support Inquiries</h3>
@@ -791,7 +775,6 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Quick Actions Panel */}
               <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-xs">
                 <h3 className="text-sm font-extrabold text-black uppercase">Quick Control Shortcuts</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -823,7 +806,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 1: ORDER MANAGEMENT */}
           {activeTab === 'orders' && (
             <div className="space-y-6">
               {loadingOrders ? (
@@ -863,7 +845,6 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <div className="flex items-center space-x-3">
-                          {/* Order Chat Button with User Reply Indicator */}
                           <button
                             onClick={() => {
                               setChatOrder(order);
@@ -897,7 +878,6 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
 
-                      {/* Dedicated Payment Proof Section on Order Card */}
                       {order.payment_proof_url && (
                         <div className="bg-pink-50/60 border border-pink-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
                           <div>
@@ -967,10 +947,8 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 2: STICKER INVENTORY WITH SEARCH & RARITY FILTER */}
           {activeTab === 'stickers' && (
             <div className="space-y-6">
-              {/* Search & Filter Bar */}
               <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap justify-between items-center gap-4 shadow-xs">
                 <div className="flex-1 min-w-[240px]">
                   <input
@@ -1045,7 +1023,6 @@ export default function AdminDashboardPage() {
                             {sticker.name}
                           </h3>
 
-                          {/* Editable Rarity / Category Dropdown */}
                           <div className="space-y-1">
                             <label className="block text-[10px] font-bold text-gray-400 uppercase">Rarity</label>
                             <select
@@ -1054,7 +1031,6 @@ export default function AdminDashboardPage() {
                                 const newRarity = e.target.value;
                                 handleUpdateStickerField(sticker.id, 'rarity', newRarity);
                                 
-                                // Optional auto-pricing when rarity changes
                                 const standardPrices: Record<string, number> = {
                                   '1-Star': 0.99,
                                   '2-Star': 1.49,
@@ -1078,7 +1054,6 @@ export default function AdminDashboardPage() {
                             </select>
                           </div>
 
-                          {/* Editable Price Input */}
                           <div className="space-y-1">
                             <label className="block text-[10px] font-bold text-gray-400 uppercase">Price (USD)</label>
                             <div className="flex items-center space-x-1">
@@ -1153,7 +1128,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 3: REVIEWS & PROOFS MODERATION */}
           {activeTab === 'feedback' && (
             <div className="space-y-8">
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
@@ -1176,7 +1150,6 @@ export default function AdminDashboardPage() {
                 </div>
               ) : (
                 <>
-                  {/* Reviews Section */}
                   <div className="space-y-4">
                     <h3 className="text-base font-extrabold text-black uppercase tracking-wider">
                       💬 Customer Reviews ({reviews.length})
@@ -1278,7 +1251,6 @@ export default function AdminDashboardPage() {
                     )}
                   </div>
 
-                  {/* Proofs Section */}
                   <div className="space-y-4 pt-4 border-t border-gray-200">
                     <h3 className="text-base font-extrabold text-black uppercase tracking-wider">
                       📸 Delivery Proofs ({proofs.length})
@@ -1299,13 +1271,10 @@ export default function AdminDashboardPage() {
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
                                 src={proof.image_url}
-                                alt={proof.caption}
+                                alt="Delivery Proof"
                                 className="h-24 w-auto object-contain rounded-lg"
                               />
                             ) : null}
-                            <span className="text-[10px] font-bold text-gray-700 text-center line-clamp-1">
-                              {proof.caption}
-                            </span>
                             <button
                               onClick={() => handleDeleteProof(proof.id)}
                               className="w-full text-red-500 hover:bg-red-50 text-[10px] font-bold py-1 rounded-lg border border-red-100 cursor-pointer"
@@ -1322,7 +1291,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* TAB 4: CUSTOMER MESSAGES (CONTACT INQUIRIES) */}
           {activeTab === 'messages' && (
             <div className="space-y-6">
               <h3 className="text-base font-extrabold text-black uppercase tracking-wider">
@@ -1389,7 +1357,6 @@ export default function AdminDashboardPage() {
                         </div>
                       )}
 
-                      {/* Reply Input Box */}
                       <div className="pt-2">
                         {replyingMsgId === msg.id ? (
                           <div className="space-y-2">
@@ -1441,7 +1408,6 @@ export default function AdminDashboardPage() {
 
       <Footer isMinimal={true} />
 
-      {/* PER-ORDER CHAT MODAL FOR ADMIN */}
       {chatOrder && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-gray-100">
@@ -1493,7 +1459,6 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* MANUAL ADD REVIEW OR PROOF MODAL */}
       {showManualFeedbackModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-100">
@@ -1537,31 +1502,25 @@ export default function AdminDashboardPage() {
                   </div>
                 </>
               ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Proof Screenshot (JPG / PNG)</label>
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-pink-300 rounded-xl cursor-pointer bg-pink-50/50 hover:bg-pink-50 transition-colors">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
-                        <span className="text-2xl mb-1">📁</span>
-                        <p className="text-xs font-bold text-gray-700">
-                          {manualFile ? manualFile.name : 'Click to browse or drag & drop image'}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG up to 10MB</p>
-                      </div>
-                      <input
-                        type="file"
-                        required
-                        accept="image/png, image/jpeg"
-                        onChange={(e) => setManualFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Caption (Optional)</label>
-                    <input type="text" placeholder="Delivered successfully!" value={manualCaption} onChange={(e) => setManualCaption(e.target.value)} className="w-full bg-[#F9F9FB] border rounded-xl p-2 text-xs" />
-                  </div>
-                </>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Proof Screenshot (JPG / PNG)</label>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-pink-300 rounded-xl cursor-pointer bg-pink-50/50 hover:bg-pink-50 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
+                      <span className="text-2xl mb-1">📁</span>
+                      <p className="text-xs font-bold text-gray-700">
+                        {manualFile ? manualFile.name : 'Click to browse or drag & drop image'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG up to 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      required
+                      accept="image/png, image/jpeg"
+                      onChange={(e) => setManualFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               )}
 
               <div className="flex space-x-3 pt-2">
@@ -1575,7 +1534,6 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Add New Sticker Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-100">

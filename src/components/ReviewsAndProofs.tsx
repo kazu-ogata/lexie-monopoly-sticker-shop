@@ -17,7 +17,36 @@ interface Review {
 interface Proof {
   id: string;
   image_url?: string;
-  caption: string;
+}
+
+function ReviewGridSkeleton() {
+  return (
+    <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start animate-pulse">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 h-32 space-y-2.5">
+          <div className="flex justify-between items-center">
+            <div className="h-3 bg-gray-200 rounded w-1/3" />
+            <div className="h-3 bg-gray-200 rounded w-1/5" />
+          </div>
+          <div className="h-3 bg-gray-200 rounded w-1/4" />
+          <div className="h-3 bg-gray-200 rounded w-1/2" />
+          <div className="h-3 bg-gray-200 rounded w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProofGridSkeleton() {
+  return (
+    <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 items-start animate-pulse">
+      {Array.from({ length: 18 }).map((_, i) => (
+        <div key={i} className="bg-white border border-gray-200 rounded-2xl h-32 p-3 flex flex-col items-center justify-center">
+          <div className="w-full h-full bg-gray-200 rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function ReviewsAndProofs() {
@@ -27,7 +56,9 @@ export default function ReviewsAndProofs() {
   const [loading, setLoading] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  
+  const reviewItemsPerPage = 12;
+  const proofItemsPerPage = 18;
 
   useEffect(() => {
     async function fetchData() {
@@ -53,10 +84,12 @@ export default function ReviewsAndProofs() {
     fetchData();
   }, [activeTab]);
 
+  const currentLimit = activeTab === 'reviews' ? reviewItemsPerPage : proofItemsPerPage;
   const currentItems = activeTab === 'reviews' ? reviews : proofs;
-  const totalPages = Math.ceil(currentItems.length / itemsPerPage) || 1;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  
+  const totalPages = Math.ceil(currentItems.length / currentLimit) || 1;
+  const indexOfLastItem = currentPage * currentLimit;
+  const indexOfFirstItem = indexOfLastItem - currentLimit;
 
   const paginatedReviews = reviews.slice(indexOfFirstItem, indexOfLastItem);
   const paginatedProofs = proofs.slice(indexOfFirstItem, indexOfLastItem);
@@ -98,9 +131,7 @@ export default function ReviewsAndProofs() {
       {/* 2. Grid Display Area */}
       <div className="w-full min-h-0">
         {loading ? (
-          <div className="w-full flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-          </div>
+          activeTab === 'reviews' ? <ReviewGridSkeleton /> : <ProofGridSkeleton />
         ) : activeTab === 'reviews' ? (
           paginatedReviews.length === 0 ? (
             <div className="w-full text-center py-8 space-y-2">
@@ -172,11 +203,11 @@ export default function ReviewsAndProofs() {
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={proof.image_url}
-                    alt={proof.caption || 'Delivery Proof'}
-                    className="h-20 w-full object-contain mb-1 rounded-lg"
+                    alt="Delivery Proof"
+                    className="w-full h-full object-contain rounded-lg"
                   />
                 ) : (
-                  <span className="text-xs text-gray-400 font-bold mb-2">Image Missing</span>
+                  <span className="text-xs text-gray-400 font-bold">Image Missing</span>
                 )}
               </div>
             ))}
