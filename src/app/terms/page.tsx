@@ -58,6 +58,7 @@ export default function TermsPage() {
                 <li>Apple Pay</li>
                 <li>Venmo</li>
                 <li>Chime</li>
+                <li>Zelle</li>
               </ul>
               <p>
                 All prices listed on the site are final and must be paid in full before order processing begins. We reserve the absolute right to adjust our sticker prices at any time to reflect market changes without providing advance notice.
