@@ -39,7 +39,7 @@ export default function Footer({ isMinimal = false }: FooterProps) {
         <span>
           We accept a variety of secure digital payment options at checkout, including{' '}
           <strong>PayPal</strong>, <strong>Cash App</strong>, <strong>Apple Pay</strong>,{' '}
-          <strong>Venmo</strong>, and <strong>Chime</strong>.
+          <strong>Venmo</strong>, <strong>Chime</strong>, and <strong>Zelle</strong>.
         </span>
       ),
     },
@@ -324,6 +324,8 @@ export default function Footer({ isMinimal = false }: FooterProps) {
               <img src="/venmo.png" alt="Venmo" className="h-6 w-auto object-contain" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/chime.png" alt="Chime" className="h-6 w-auto object-contain" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/zelle.png" alt="Zelle" className="h-6 w-auto object-contain" />
 
               {/* Facebook Icon placed next to payment methods */}
               <a

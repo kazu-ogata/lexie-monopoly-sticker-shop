@@ -80,6 +80,12 @@ function CheckoutContent() {
       note: 'Chime-to-Chime instant transfer.',
       image: '/check-chime.png',
     },
+    zelle: {
+      name: 'Zelle',
+      handle: 'support.lexiestickers@gmail.com',
+      note: 'Direct bank transfer via Zelle using email or phone.',
+      image: '/check-zelle.png',
+    },
   };
 
   const paymentMethods = [
@@ -88,6 +94,7 @@ function CheckoutContent() {
     { id: 'applepay', name: 'Apple Pay', image: '/check-applepay.png', desc: 'Instant checkout with Apple Cash' },
     { id: 'venmo', name: 'Venmo', image: '/check-venmo.png', desc: 'Pay smoothly with your Venmo handle' },
     { id: 'chime', name: 'Chime', image: '/check-chime.png', desc: 'Bank transfer via Chime' },
+    { id: 'zelle', name: 'Zelle', image: '/check-zelle.png', desc: 'Direct bank transfer via Zelle' },
   ];
 
   // Step 1: Open Payment Modal (Does NOT save order yet)
