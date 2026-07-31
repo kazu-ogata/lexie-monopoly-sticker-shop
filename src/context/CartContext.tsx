@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 
 export interface CartItem {
   id: string;
@@ -29,42 +28,48 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [userId, setUserId] = useState<string>('guest');
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(null);
-
-  // 1. Monitor user session changes to switch cart keys
-  useEffect(() => {
-    async function resolveUser() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUid = session?.user?.id || 'guest';
-      setUserId(currentUid);
-
-      // Load saved cart for current account
-      const cartKey = `lexie_cart_${currentUid}`;
-      const savedCart = localStorage.getItem(cartKey);
-      if (savedCart) {
-        try {
-          setCart(JSON.parse(savedCart));
-        } catch {
-          setCart([]);
-        }
-      } else {
-        setCart([]);
-      }
+  // 1. Initialize synchronously from localStorage so data is NEVER lost on redirect
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('lexie_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
+  });
 
-    resolveUser();
-  }, []);
+  const [buyNowItem, setBuyNowItemState] = useState<CartItem | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('lexie_buynow');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // 2. Sync cart changes to user-specific localStorage key
+  // 2. Keep localStorage synced instantly whenever cart changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const cartKey = `lexie_cart_${userId}`;
-      localStorage.setItem(cartKey, JSON.stringify(cart));
+      localStorage.setItem('lexie_cart', JSON.stringify(cart));
     }
-  }, [cart, userId]);
+  }, [cart]);
+
+  // 3. Keep localStorage synced instantly whenever buyNowItem changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (buyNowItem) {
+        localStorage.setItem('lexie_buynow', JSON.stringify(buyNowItem));
+      } else {
+        localStorage.removeItem('lexie_buynow');
+      }
+    }
+  }, [buyNowItem]);
+
+  const setBuyNowItem = (item: CartItem | null) => {
+    setBuyNowItemState(item);
+  };
 
   const addToCart = (newItem: CartItem) => {
     setCart((prev) => {
@@ -94,7 +99,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => {
+    setCart([]);
+    setBuyNowItemState(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('lexie_cart');
+      localStorage.removeItem('lexie_buynow');
+    }
+  };
 
   const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalCost = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
