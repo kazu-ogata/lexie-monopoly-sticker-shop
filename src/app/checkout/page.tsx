@@ -367,7 +367,7 @@ function CheckoutContent() {
               </div>
               <div className="flex justify-between items-center border-t border-gray-200 pt-2">
                 <span className="font-bold text-gray-600">Email Contact:</span>
-                <span className="font-semibold text-black select-all">support@lexiestickers.com</span>
+                <span className="font-semibold text-black select-all">support.lexiestickers@gmail.com</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-bold text-gray-600">Phone Contact:</span>

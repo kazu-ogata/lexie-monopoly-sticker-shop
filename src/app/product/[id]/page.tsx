@@ -450,7 +450,7 @@ function ProductDetailContent() {
                     <strong>30-Minute Delivery:</strong> Because these are digital items, we prioritize speed! 95% of our orders are processed and completed within <strong>15 to 30 minutes</strong>.
                   </li>
                   <li>
-                    <strong>Need Help?</strong> If you haven&apos;t received your sticker after 30 minutes, please don&apos;t hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website&apos;s Live Chat or email us at <strong>support@lexiestickers.com</strong>.
+                    <strong>Need Help?</strong> If you haven&apos;t received your sticker after 30 minutes, please don&apos;t hesitate to reach out! Check your email inbox (and junk folder)—we might be missing your invite link or need extra details. You can also contact us instantly via our website&apos;s Live Chat or email us at <strong>support.lexiestickers@gmail.com</strong>.
                   </li>
                 </ul>
               </div>

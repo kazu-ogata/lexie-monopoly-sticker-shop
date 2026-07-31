@@ -48,7 +48,7 @@ export default function Footer({ isMinimal = false }: FooterProps) {
       answer: (
         <span>
           Delivery usually takes between <strong>15 to 30 minutes</strong>. If your stickers haven’t arrived within this timeframe, please reach out to us immediately at{' '}
-          <a href="mailto:support@lexiestickers.com" className="underline font-bold text-gray-900">support@lexiestickers.com</a> so we can look into it right away.
+          <a href="mailto:support.lexiestickers@gmail.com" className="underline font-bold text-gray-900">support.lexiestickers@gmail.com</a> so we can look into it right away.
         </span>
       ),
     },
@@ -237,10 +237,10 @@ export default function Footer({ isMinimal = false }: FooterProps) {
               <div className="pt-1 text-[10px] text-gray-700 text-center border-t border-pink-300/50">
                 Direct Email:{' '}
                 <a
-                  href="mailto:support@lexiestickers.com?subject=Support%20Inquiry"
+                  href="mailto:support.lexiestickers@gmail.com?subject=Support%20Inquiry"
                   className="font-bold text-gray-900 hover:text-pink-700 underline"
                 >
-                  support@lexiestickers.com
+                  support.lexiestickers@gmail.com
                 </a>
               </div>
             </div>

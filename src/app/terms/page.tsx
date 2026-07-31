@@ -109,7 +109,7 @@ export default function TermsPage() {
                 8. Contact Support
               </h2>
               <p>
-                If you have any questions, delivery issues, or concerns regarding these Terms of Service, please do not hesitate to reach out to our team at <strong>support@lexiestickers.com</strong>.
+                If you have any questions, delivery issues, or concerns regarding these Terms of Service, please do not hesitate to reach out to our team at <strong>support.lexiestickers@gmail.com</strong>.
               </p>
             </section>
           </div>
